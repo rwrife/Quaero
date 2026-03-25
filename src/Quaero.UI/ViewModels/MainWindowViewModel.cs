@@ -4,7 +4,6 @@ using System.Runtime.CompilerServices;
 using Quaero.Core.Models;
 using Quaero.Core.Services;
 using Quaero.Core.Storage;
-using Quaero.Plugins.Abstractions;
 
 namespace Quaero.UI.ViewModels;
 
@@ -12,6 +11,8 @@ public class MainWindowViewModel : INotifyPropertyChanged
 {
     private readonly IndexingService _indexingService;
     private readonly IndexStore _store;
+    private readonly DataSourceStore _dataSourceStore;
+    private readonly PluginLoader _pluginLoader;
     private string _searchText = string.Empty;
     private string _statusText = "Ready";
     private bool _isIndexing;
@@ -21,9 +22,19 @@ public class MainWindowViewModel : INotifyPropertyChanged
     {
         var config = new IndexConfiguration();
         _store = new IndexStore(config);
-        _indexingService = new IndexingService(_store,
+        _dataSourceStore = new DataSourceStore();
+        _pluginLoader = new PluginLoader(config.PluginsDirectory,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<PluginLoader>.Instance);
+        _indexingService = new IndexingService(_store, _dataSourceStore, _pluginLoader,
             Microsoft.Extensions.Logging.Abstractions.NullLogger<IndexingService>.Instance);
+
+        // Discover plugins from plugins folder
+        _pluginLoader.DiscoverPlugins();
+
+        DataSourcesVM = new DataSourcesViewModel(_dataSourceStore, _indexingService, _store, _pluginLoader);
     }
+
+    public DataSourcesViewModel DataSourcesVM { get; }
 
     public string SearchText
     {
@@ -54,7 +65,6 @@ public class MainWindowViewModel : INotifyPropertyChanged
     }
 
     public ObservableCollection<SearchResult> SearchResults { get; } = new();
-    public ObservableCollection<PluginMetadata> LoadedPlugins { get; } = new();
 
     public async Task SearchAsync()
     {
@@ -83,12 +93,13 @@ public class MainWindowViewModel : INotifyPropertyChanged
     public async Task RunIndexingAsync()
     {
         IsIndexing = true;
-        StatusText = "Indexing...";
+        StatusText = "Indexing all sources...";
         try
         {
-            await _indexingService.RunIndexingAsync();
+            await _indexingService.RunAllAsync();
             var count = await _store.GetDocumentCountAsync();
             StatusText = $"Indexing complete. {count} documents in index.";
+            DataSourcesVM.RefreshDataSources();
         }
         catch (Exception ex)
         {
@@ -111,13 +122,6 @@ public class MainWindowViewModel : INotifyPropertyChanged
         {
             StatusText = $"Compact error: {ex.Message}";
         }
-    }
-
-    public void RegisterPlugin(ISearchPlugin plugin, PluginConfiguration config)
-    {
-        plugin.InitializeAsync(config).GetAwaiter().GetResult();
-        _indexingService.RegisterPlugin(plugin);
-        LoadedPlugins.Add(plugin.Metadata);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

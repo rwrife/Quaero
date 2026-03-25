@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <PackageReference Include="Markdig" Version="0.38.0" />
+    <PackageReference Include="Microsoft.Extensions.FileSystemGlobbing" Version="9.0.3" />
   </ItemGroup>
 
   <PropertyGroup>

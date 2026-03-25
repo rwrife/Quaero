@@ -2,83 +2,134 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Quaero.UI.ViewModels"
         x:Class="Quaero.UI.Views.MainWindow"
-        Title="Quaero - Search"
-        Width="900" Height="650"
-        MinWidth="600" MinHeight="400">
+        Title="Quaero"
+        Width="1000" Height="700"
+        MinWidth="700" MinHeight="500">
 
     <Window.DataContext>
         <vm:MainWindowViewModel />
     </Window.DataContext>
 
-    <DockPanel Margin="16">
+    <DockPanel>
         <!-- Status bar -->
-        <Border DockPanel.Dock="Bottom" Padding="8,4" Background="#F0F0F0" CornerRadius="4" Margin="0,8,0,0">
+        <Border DockPanel.Dock="Bottom" Padding="12,6" Background="#F0F0F0">
             <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="#666" />
         </Border>
 
-        <!-- Top toolbar -->
-        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
-            <Button Content="Index Now" Command="{Binding RunIndexingCommand}" IsEnabled="{Binding !IsIndexing}"
-                    Padding="12,6" />
-            <Button Content="Compact" Command="{Binding CompactCommand}" Padding="12,6" />
-        </StackPanel>
-
-        <!-- Search box -->
-        <TextBox DockPanel.Dock="Top" Text="{Binding SearchText, Mode=TwoWay}"
-                 Watermark="Search your indexed content..."
-                 Margin="0,0,0,12" Padding="8" FontSize="16" />
-
-        <!-- Results area -->
-        <Grid ColumnDefinitions="*,*">
-            <!-- Results list -->
-            <ListBox Grid.Column="0" ItemsSource="{Binding SearchResults}"
-                     SelectedItem="{Binding SelectedResult}" Margin="0,0,8,0">
-                <ListBox.ItemTemplate>
-                    <DataTemplate>
-                        <StackPanel Margin="4">
-                            <TextBlock Text="{Binding Document.Title}" FontWeight="Bold" FontSize="14"
-                                       TextTrimming="CharacterEllipsis" />
-                            <TextBlock Text="{Binding Document.Summary}" FontSize="12" Foreground="#888"
-                                       MaxLines="2" TextTrimming="CharacterEllipsis" />
-                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
-                                <TextBlock Text="{Binding Document.Provider}" FontSize="10"
-                                           Foreground="#0078D4" />
-                                <TextBlock Text="{Binding Document.Type}" FontSize="10" Foreground="#888" />
-                            </StackPanel>
-                        </StackPanel>
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
-
-            <!-- Detail panel -->
-            <Border Grid.Column="1" Padding="12" Background="#FAFAFA" CornerRadius="4"
-                    IsVisible="{Binding SelectedResult, Converter={x:Static ObjectConverters.IsNotNull}}">
-                <ScrollViewer>
-                    <StackPanel Spacing="8">
-                        <TextBlock Text="{Binding SelectedResult.Document.Title}"
-                                   FontSize="18" FontWeight="Bold" TextWrapping="Wrap" />
-                        <TextBlock Text="{Binding SelectedResult.Document.Location}"
-                                   FontSize="11" Foreground="#0078D4" TextWrapping="Wrap" />
-                        <StackPanel Orientation="Horizontal" Spacing="12">
-                            <TextBlock FontSize="11" Foreground="#888">
-                                <Run Text="Provider: " />
-                                <Run Text="{Binding SelectedResult.Document.Provider}" />
-                            </TextBlock>
-                            <TextBlock FontSize="11" Foreground="#888">
-                                <Run Text="Type: " />
-                                <Run Text="{Binding SelectedResult.Document.Type}" />
-                            </TextBlock>
-                            <TextBlock FontSize="11" Foreground="#888">
-                                <Run Text="Machine: " />
-                                <Run Text="{Binding SelectedResult.Document.Machine}" />
-                            </TextBlock>
-                        </StackPanel>
-                        <Separator Margin="0,4" />
-                        <TextBlock Text="{Binding SelectedResult.Document.Summary}"
-                                   TextWrapping="Wrap" FontSize="13" />
+        <TabControl Margin="12">
+            <!-- ===== SEARCH TAB ===== -->
+            <TabItem Header="Search">
+                <DockPanel Margin="4">
+                    <!-- Toolbar -->
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
+                        <Button Content="Index All Now" Click="OnIndexAllClicked" Padding="12,6" />
+                        <Button Content="Compact" Click="OnCompactClicked" Padding="12,6" />
                     </StackPanel>
-                </ScrollViewer>
-            </Border>
-        </Grid>
+
+                    <!-- Search box -->
+                    <TextBox DockPanel.Dock="Top" Text="{Binding SearchText, Mode=TwoWay}"
+                             Watermark="Search your indexed content..."
+                             Margin="0,0,0,12" Padding="8" FontSize="16" />
+
+                    <!-- Results -->
+                    <Grid ColumnDefinitions="*,*">
+                        <ListBox Grid.Column="0" ItemsSource="{Binding SearchResults}"
+                                 SelectedItem="{Binding SelectedResult}" Margin="0,0,8,0">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="4">
+                                        <TextBlock Text="{Binding Document.Title}" FontWeight="Bold" FontSize="14"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding Document.Summary}" FontSize="12" Foreground="#888"
+                                                   MaxLines="2" TextTrimming="CharacterEllipsis" />
+                                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                                            <TextBlock Text="{Binding Document.Provider}" FontSize="10"
+                                                       Foreground="#0078D4" />
+                                            <TextBlock Text="{Binding Document.Type}" FontSize="10" Foreground="#888" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <Border Grid.Column="1" Padding="12" Background="#FAFAFA" CornerRadius="4"
+                                IsVisible="{Binding SelectedResult, Converter={x:Static ObjectConverters.IsNotNull}}">
+                            <ScrollViewer>
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="{Binding SelectedResult.Document.Title}"
+                                               FontSize="18" FontWeight="Bold" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding SelectedResult.Document.Location}"
+                                               FontSize="11" Foreground="#0078D4" TextWrapping="Wrap" />
+                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                        <TextBlock FontSize="11" Foreground="#888">
+                                            <Run Text="Provider: " /><Run Text="{Binding SelectedResult.Document.Provider}" />
+                                        </TextBlock>
+                                        <TextBlock FontSize="11" Foreground="#888">
+                                            <Run Text="Type: " /><Run Text="{Binding SelectedResult.Document.Type}" />
+                                        </TextBlock>
+                                        <TextBlock FontSize="11" Foreground="#888">
+                                            <Run Text="Machine: " /><Run Text="{Binding SelectedResult.Document.Machine}" />
+                                        </TextBlock>
+                                    </StackPanel>
+                                    <Separator Margin="0,4" />
+                                    <TextBlock Text="{Binding SelectedResult.Document.Summary}"
+                                               TextWrapping="Wrap" FontSize="13" />
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Border>
+                    </Grid>
+                </DockPanel>
+            </TabItem>
+
+            <!-- ===== DATA SOURCES TAB ===== -->
+            <TabItem Header="Data Sources">
+                <DockPanel Margin="4" DataContext="{Binding DataSourcesVM}">
+                    <!-- Indexer status -->
+                    <Border DockPanel.Dock="Top" Padding="12,8" Background="#E8F0FE" CornerRadius="4" Margin="0,0,0,12">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <TextBlock Text="Indexer Status:" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding IndexerStatusText}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Toolbar -->
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
+                        <Button Content="Add Data Source" Click="OnAddDataSourceClicked" Padding="12,6" />
+                        <Button Content="Edit" Click="OnEditDataSourceClicked" Padding="12,6"
+                                IsEnabled="{Binding SelectedDataSource, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                        <Button Content="Remove" Click="OnRemoveDataSourceClicked" Padding="12,6"
+                                IsEnabled="{Binding SelectedDataSource, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                        <Button Content="Toggle" Click="OnToggleDataSourceClicked" Padding="12,6"
+                                IsEnabled="{Binding SelectedDataSource, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                        <Separator Width="1" Margin="4,0" />
+                        <Button Content="Run Selected" Click="OnRunSelectedClicked" Padding="12,6"
+                                IsEnabled="{Binding SelectedDataSource, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                        <Button Content="Run All" Click="OnRunAllClicked" Padding="12,6" />
+                        <Button Content="Refresh" Click="OnRefreshClicked" Padding="12,6" />
+                    </StackPanel>
+
+                    <!-- Data sources list -->
+                    <ListBox ItemsSource="{Binding DataSources}" SelectedItem="{Binding SelectedDataSource}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnDefinitions="*,Auto,Auto,Auto" Margin="4,6">
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="14" />
+                                        <TextBlock FontSize="12" Foreground="#888">
+                                            <Run Text="{Binding PluginName}" /> · <Run Text="{Binding StatusText}" />
+                                        </TextBlock>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" Text="{Binding CronSchedule}" FontSize="11"
+                                               Foreground="#666" VerticalAlignment="Center" Margin="12,0" FontFamily="Consolas" />
+                                    <Border Grid.Column="2" Padding="6,2" CornerRadius="3" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding EnabledText}" FontSize="11" />
+                                    </Border>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </TabItem>
+        </TabControl>
     </DockPanel>
 </Window>

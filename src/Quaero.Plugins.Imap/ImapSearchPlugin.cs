@@ -18,6 +18,7 @@ public class ImapSearchPlugin : ISearchPlugin
     private string _password = string.Empty;
     private string _provider = "email";
     private int _maxMessages = 500;
+    private DateTime? _lastSuccessfulRun;
 
     public PluginMetadata Metadata => new()
     {
@@ -27,6 +28,17 @@ public class ImapSearchPlugin : ISearchPlugin
         Version = "1.0.0",
         SupportedFileExtensions = []
     };
+
+    public IReadOnlyList<PluginSettingDescriptor> SettingDescriptors =>
+    [
+        new() { Key = "Host", DisplayName = "IMAP Server", Description = "IMAP server hostname (e.g. imap.gmail.com)", SettingType = PluginSettingType.Text, DefaultValue = "imap.gmail.com", IsRequired = true },
+        new() { Key = "Port", DisplayName = "Port", Description = "IMAP server port", SettingType = PluginSettingType.Number, DefaultValue = "993" },
+        new() { Key = "UseSsl", DisplayName = "Use SSL", Description = "Connect using SSL/TLS", SettingType = PluginSettingType.Boolean, DefaultValue = "true" },
+        new() { Key = "Username", DisplayName = "Username", Description = "Email address or username", SettingType = PluginSettingType.Text, IsRequired = true },
+        new() { Key = "Password", DisplayName = "Password", Description = "Password or app-specific password", SettingType = PluginSettingType.Password, IsRequired = true },
+        new() { Key = "Provider", DisplayName = "Provider Name", Description = "Display name for this email source (e.g. gmail, outlook)", SettingType = PluginSettingType.Text, DefaultValue = "email" },
+        new() { Key = "MaxMessages", DisplayName = "Max Messages", Description = "Maximum number of messages to index", SettingType = PluginSettingType.Number, DefaultValue = "500" }
+    ];
 
     public Task InitializeAsync(PluginConfiguration configuration, CancellationToken cancellationToken = default)
     {
@@ -38,6 +50,7 @@ public class ImapSearchPlugin : ISearchPlugin
         _password = settings.GetValueOrDefault("Password", string.Empty);
         _provider = settings.GetValueOrDefault("Provider", "email");
         _maxMessages = int.TryParse(settings.GetValueOrDefault("MaxMessages", "500"), out var m) ? m : 500;
+        _lastSuccessfulRun = configuration.LastSuccessfulRun;
         return Task.CompletedTask;
     }
 
@@ -54,7 +67,18 @@ public class ImapSearchPlugin : ISearchPlugin
         var inbox = client.Inbox;
         await inbox.OpenAsync(FolderAccess.ReadOnly, cancellationToken);
 
-        var uids = await inbox.SearchAsync(SearchQuery.All, cancellationToken);
+        // Incremental: only fetch emails since last successful run
+        MailKit.Search.SearchQuery searchQuery;
+        if (_lastSuccessfulRun.HasValue)
+        {
+            searchQuery = MailKit.Search.SearchQuery.DeliveredAfter(_lastSuccessfulRun.Value);
+        }
+        else
+        {
+            searchQuery = MailKit.Search.SearchQuery.All;
+        }
+
+        var uids = await inbox.SearchAsync(searchQuery, cancellationToken);
         var toProcess = uids.Reverse().Take(_maxMessages);
 
         foreach (var uid in toProcess)
