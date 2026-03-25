@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Quaero.Core\Quaero.Core.csproj" />
+    <ProjectReference Include="..\Quaero.Plugins.Abstractions\Quaero.Plugins.Abstractions.csproj" />
+    <ProjectReference Include="..\Quaero.Plugins.Markdown\Quaero.Plugins.Markdown.csproj" />
+    <ProjectReference Include="..\Quaero.Plugins.Text\Quaero.Plugins.Text.csproj" />
+    <ProjectReference Include="..\Quaero.Plugins.Json\Quaero.Plugins.Json.csproj" />
+    <ProjectReference Include="..\Quaero.Plugins.Imap\Quaero.Plugins.Imap.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.3" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Quaero.Core/Quaero.Core.csproj" />
+    <Project Path="src/Quaero.Indexer/Quaero.Indexer.csproj" />
+    <Project Path="src/Quaero.Plugins.Abstractions/Quaero.Plugins.Abstractions.csproj" />
+    <Project Path="src/Quaero.Plugins.Imap/Quaero.Plugins.Imap.csproj" />
+    <Project Path="src/Quaero.Plugins.Json/Quaero.Plugins.Json.csproj" />
+    <Project Path="src/Quaero.Plugins.Markdown/Quaero.Plugins.Markdown.csproj" />
+    <Project Path="src/Quaero.Plugins.Text/Quaero.Plugins.Text.csproj" />
+    <Project Path="src/Quaero.UI/Quaero.UI.csproj" />
+  </Folder>
+</Solution>
