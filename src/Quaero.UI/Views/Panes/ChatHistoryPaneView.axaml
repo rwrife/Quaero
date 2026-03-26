@@ -1,0 +1,22 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Quaero.UI.Views.Panes.ChatHistoryPaneView">
+    <StackPanel Spacing="12">
+        <TextBlock Text="Chat History Entry" FontSize="28" FontWeight="SemiBold" />
+        <Border Background="#EEF4FC" CornerRadius="10" Padding="12">
+            <StackPanel Spacing="10">
+                <TextBlock Text="Prompt" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding SelectedChatHistory.Prompt}" TextWrapping="Wrap" Foreground="#324A65" />
+                <Separator />
+                <TextBlock Text="Response Snapshot" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding SelectedChatHistory.Response}" TextWrapping="Wrap" Foreground="#324A65" />
+                <TextBlock FontSize="12" Foreground="#5A708A">
+                    <Run Text="{Binding SelectedChatHistory.ResultLabel}" />
+                    <Run Text=" · " />
+                    <Run Text="{Binding SelectedChatHistory.RanAt, StringFormat='{}{0:f}'}" />
+                </TextBlock>
+            </StackPanel>
+        </Border>
+        <Button Content="Reuse Prompt In Chat" HorizontalAlignment="Left" Click="OnReuseChatPromptClicked" />
+    </StackPanel>
+</UserControl>

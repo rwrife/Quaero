@@ -1,0 +1,18 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Quaero.UI.Views.Panes.SearchHistoryPaneView">
+    <StackPanel Spacing="12">
+        <TextBlock Text="Search History Entry" FontSize="28" FontWeight="SemiBold" />
+        <Border Background="#EEF4FC" CornerRadius="10" Padding="12">
+            <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,Auto,Auto">
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="Query" FontWeight="SemiBold" />
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SelectedSearchHistory.Query}" TextWrapping="Wrap" />
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Executed" FontWeight="SemiBold" Margin="0,8,0,0" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SelectedSearchHistory.RanAt, StringFormat='{}{0:f}'}" Margin="0,8,0,0" />
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="Results" FontWeight="SemiBold" Margin="0,8,0,0" />
+                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SelectedSearchHistory.ResultLabel}" Margin="0,8,0,0" />
+            </Grid>
+        </Border>
+        <Button Content="Run This Search Again" HorizontalAlignment="Left" Click="OnRerunSearchHistoryClicked" />
+    </StackPanel>
+</UserControl>

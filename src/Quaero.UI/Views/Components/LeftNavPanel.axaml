@@ -1,0 +1,102 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Quaero.UI.Views.Components.LeftNavPanel">
+    <Border Classes="leftPanelShell">
+        <DockPanel>
+            <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+                <TextBlock Text="Quaero" Foreground="#EFF4FD" FontSize="26" FontWeight="SemiBold" />
+                <TextBlock Text="Local Search Workspace" Foreground="#9CB3D8" FontSize="12" />
+                <Border Height="1" Background="#3B4350" Margin="0,10,0,0" />
+            </StackPanel>
+
+            <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,12,0,0">
+                <Button Classes="leftNavButton" Content="New Search" Click="OnNewSearchClicked" />
+                <Button Classes="leftNavButton" Content="New Chat" Click="OnNewChatClicked" />
+            </StackPanel>
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Spacing="10">
+                    <Button x:Name="DataSourcesHeaderButton" Classes="leftNavButton">
+                        <Button.Content>
+                            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                <PathIcon Data="M12,3C7.58,3 4,4.79 4,7V17C4,19.21 7.58,21 12,21C16.42,21 20,19.21 20,17V7C20,4.79 16.42,3 12,3ZM12,5C15.31,5 18,5.9 18,7C18,8.1 15.31,9 12,9C8.69,9 6,8.1 6,7C6,5.9 8.69,5 12,5ZM12,15C8.69,15 6,14.1 6,13V10.91C7.38,11.78 9.54,12.3 12,12.3C14.46,12.3 16.62,11.78 18,10.91V13C18,14.1 15.31,15 12,15ZM12,19C8.69,19 6,18.1 6,17V14.91C7.38,15.78 9.54,16.3 12,16.3C14.46,16.3 16.62,15.78 18,14.91V17C18,18.1 15.31,19 12,19Z"
+                                          Width="14"
+                                          Height="14"
+                                          Foreground="#BFD0EA" />
+                                <TextBlock Text="DATA SOURCES" Foreground="#BFD0EA" FontWeight="SemiBold" FontSize="12" />
+                            </StackPanel>
+                        </Button.Content>
+                    </Button>
+
+                    <StackPanel x:Name="DataSourcesSectionPanel" Spacing="8" Margin="0,8,0,0" MaxHeight="0" Opacity="0" IsHitTestVisible="False" ClipToBounds="True">
+                        <StackPanel.Transitions>
+                            <Transitions>
+                                <DoubleTransition Property="MaxHeight" Duration="0:0:0.22" />
+                                <DoubleTransition Property="Opacity" Duration="0:0:0.2" />
+                            </Transitions>
+                        </StackPanel.Transitions>
+                        <Button Content="+ Add Data Source" Click="OnAddDataSourceClicked" />
+                        <ListBox x:Name="DataSourcesList"
+                                 Classes="leftNavList"
+                                 ItemsSource="{Binding DataSourcesVM.DataSources}"
+                                 SelectionChanged="OnDataSourcesSelectionChanged"
+                                 Background="#00000000"
+                                 BorderThickness="0">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="12,8" HorizontalAlignment="Stretch">
+                                        <TextBlock Text="{Binding Name}" Foreground="#EFF4FD" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding PluginName}" Foreground="#C6D9F5" FontSize="11" TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </StackPanel>
+
+                    <TextBlock Text="SEARCH HISTORY" Foreground="#BFD0EA" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
+                    <ListBox x:Name="SearchHistoryList"
+                             Classes="leftNavList"
+                             ItemsSource="{Binding SearchHistory}"
+                             SelectionChanged="OnSearchHistorySelectionChanged"
+                             Background="#00000000"
+                             BorderThickness="0">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Margin="12,8" Spacing="2" HorizontalAlignment="Stretch">
+                                    <TextBlock Text="{Binding Query}" Foreground="#EFF4FD" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding ResultLabel}" Foreground="#C6D9F5" FontSize="11" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <TextBlock Text="CHAT HISTORY" Foreground="#BFD0EA" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
+                    <ListBox x:Name="ChatHistoryList"
+                             Classes="leftNavList"
+                             ItemsSource="{Binding ChatHistory}"
+                             SelectionChanged="OnChatHistorySelectionChanged"
+                             Background="#00000000"
+                             BorderThickness="0">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Margin="12,8" Spacing="2" HorizontalAlignment="Stretch">
+                                    <TextBlock Text="{Binding Prompt}" Foreground="#EFF4FD" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding ResultLabel}" Foreground="#C6D9F5" FontSize="11" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <Border Height="1" Background="#3B4350" Margin="0,8,0,0" />
+                    <Button Classes="leftNavButton" Click="OnOpenSettingsClicked">
+                        <Button.Content>
+                            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                <TextBlock Text="SETTINGS" Foreground="#BFD0EA" FontWeight="SemiBold" FontSize="12" />
+                            </StackPanel>
+                        </Button.Content>
+                    </Button>
+                </StackPanel>
+            </ScrollViewer>
+        </DockPanel>
+    </Border>
+</UserControl>

@@ -1,8 +1,6 @@
 using System.Linq;
 using System.ComponentModel;
 using Avalonia.Controls;
-using Avalonia.Input;
-using Avalonia.Interactivity;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using Quaero.Core.Models;
@@ -12,26 +10,55 @@ namespace Quaero.UI.Views;
 
 public partial class MainWindow : Window
 {
-    private bool _synchronizingSelections;
-    private bool _isDataSourcesExpanded;
-
     public MainWindow()
     {
         InitializeComponent();
         RequestedThemeVariant = ThemeVariant.Light;
-        DataSourcesHeaderButton.Click += OnDataSourcesHeaderClicked;
+        HookEvents();
         Opened += OnOpened;
     }
 
     private MainWindowViewModel VM => (MainWindowViewModel)DataContext!;
 
-    private async void OnIndexAllClicked(object? sender, RoutedEventArgs e)
+    private void HookEvents()
+    {
+        LeftNavPanel.NewSearchRequested += OnNewSearchRequested;
+        LeftNavPanel.NewChatRequested += OnNewChatRequested;
+        LeftNavPanel.OpenSettingsRequested += OnOpenSettingsRequested;
+        LeftNavPanel.AddDataSourceRequested += OnAddDataSourceRequested;
+        LeftNavPanel.DataSourceSelected += OnDataSourceSelected;
+        LeftNavPanel.SearchHistorySelected += OnSearchHistorySelected;
+        LeftNavPanel.ChatHistorySelected += OnChatHistorySelected;
+
+        WorkspacePane.SearchModeRequested += OnSearchModeRequested;
+        WorkspacePane.ChatModeRequested += OnChatModeRequested;
+        WorkspacePane.SubmitPrimaryInputRequested += OnSubmitPrimaryInputRequested;
+
+        DataSourcePane.EditDataSourceRequested += OnEditDataSourceRequested;
+        DataSourcePane.RemoveDataSourceRequested += OnRemoveDataSourceRequested;
+        DataSourcePane.ToggleDataSourceRequested += OnToggleDataSourceRequested;
+        DataSourcePane.RunSelectedRequested += OnRunSelectedRequested;
+        DataSourcePane.RefreshDataSourceFilesRequested += OnRefreshDataSourceFilesRequested;
+        DataSourcePane.LoadMoreDataSourceFilesRequested += OnLoadMoreDataSourceFilesRequested;
+        DataSourcePane.IndexedFileSelected += OnIndexedFileSelected;
+
+        IndexedFilePane.BackRequested += OnBackRequested;
+        SearchHistoryPane.RerunRequested += OnRerunSearchHistoryRequested;
+        ChatHistoryPane.ReusePromptRequested += OnReuseChatPromptRequested;
+
+        SettingsPane.ToggleIndexerRequested += OnToggleIndexerRequested;
+        SettingsPane.CompactRequested += OnCompactRequested;
+        SettingsPane.IndexAllRequested += OnIndexAllRequested;
+        SettingsPane.RefreshRequested += OnRefreshRequested;
+    }
+
+    private async void OnIndexAllRequested()
         => await VM.RunIndexingAsync();
 
-    private void OnCompactClicked(object? sender, RoutedEventArgs e)
+    private void OnCompactRequested()
         => VM.CompactIndex();
 
-    private async void OnAddDataSourceClicked(object? sender, RoutedEventArgs e)
+    private async void OnAddDataSourceRequested()
     {
         try
         {
@@ -60,7 +87,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void OnEditDataSourceClicked(object? sender, RoutedEventArgs e)
+    private async void OnEditDataSourceRequested()
     {
         var selected = VM.DataSourcesVM.SelectedDataSource;
         if (selected == null) return;
@@ -77,7 +104,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnRemoveDataSourceClicked(object? sender, RoutedEventArgs e)
+    private void OnRemoveDataSourceRequested()
     {
         var selected = VM.DataSourcesVM.SelectedDataSource;
         if (selected == null) return;
@@ -85,7 +112,7 @@ public partial class MainWindow : Window
         VM.StatusText = $"Removed data source: {selected.Name}";
     }
 
-    private async void OnToggleDataSourceClicked(object? sender, RoutedEventArgs e)
+    private async void OnToggleDataSourceRequested()
     {
         var selected = VM.DataSourcesVM.SelectedDataSource;
         if (selected == null) return;
@@ -93,7 +120,7 @@ public partial class MainWindow : Window
         await VM.SelectDataSourceAsync(VM.DataSourcesVM.DataSources.FirstOrDefault(ds => ds.Id == selected.Id));
     }
 
-    private async void OnRunSelectedClicked(object? sender, RoutedEventArgs e)
+    private async void OnRunSelectedRequested()
     {
         var selected = VM.DataSourcesVM.SelectedDataSource;
         if (selected == null) return;
@@ -101,144 +128,98 @@ public partial class MainWindow : Window
         await VM.RefreshSelectedDataSourceFilesAsync();
     }
 
-    private async void OnRunAllClicked(object? sender, RoutedEventArgs e)
-        => await VM.RunIndexingAsync();
-
-    private async void OnRefreshClicked(object? sender, RoutedEventArgs e)
+    private async void OnRefreshRequested()
     {
         VM.DataSourcesVM.RefreshDataSources();
         await VM.RefreshSelectedDataSourceFilesAsync();
     }
 
-    private void OnToggleIndexerClicked(object? sender, RoutedEventArgs e)
+    private void OnToggleIndexerRequested()
         => VM.SettingsVM.ToggleIndexer();
 
-    private async void OnSubmitPrimaryInputClicked(object? sender, RoutedEventArgs e)
+    private async void OnSubmitPrimaryInputRequested()
     {
         await VM.SubmitPrimaryInputAsync();
         ApplyPaneVisibility();
     }
 
-    private async void OnPrimaryInputKeyDown(object? sender, KeyEventArgs e)
-    {
-        if (e.Key != Key.Enter) return;
-        e.Handled = true;
-        await VM.SubmitPrimaryInputAsync();
-        ApplyPaneVisibility();
-    }
-
-    private void OnSearchModeChecked(object? sender, RoutedEventArgs e)
+    private void OnSearchModeRequested()
     {
         VM.SelectWorkspace(useChatMode: false);
         ApplyPaneVisibility();
     }
 
-    private void OnChatModeChecked(object? sender, RoutedEventArgs e)
+    private void OnChatModeRequested()
     {
         VM.SelectWorkspace(useChatMode: true);
         ApplyPaneVisibility();
     }
 
-    private async void OnDataSourcesSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    private async void OnDataSourceSelected(DataSourceItemViewModel selected)
     {
-        if (_synchronizingSelections) return;
-        if (DataSourcesList.SelectedItem is not DataSourceItemViewModel selected) return;
-        ClearOtherSelections(DataSourcesList);
         await VM.SelectDataSourceAsync(selected);
         ApplyPaneVisibility();
     }
 
-    private void OnDataSourcesHeaderClicked(object? sender, RoutedEventArgs e)
+    private void OnSearchHistorySelected(SearchHistoryEntry selected)
     {
-        _isDataSourcesExpanded = !_isDataSourcesExpanded;
-        ApplyDataSourcesSectionState();
-    }
-
-    private void OnSearchHistorySelectionChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        if (_synchronizingSelections) return;
-        if (SearchHistoryList.SelectedItem is not SearchHistoryEntry selected) return;
-        ClearOtherSelections(SearchHistoryList);
         VM.SelectSearchHistory(selected);
         ApplyPaneVisibility();
     }
 
-    private void OnChatHistorySelectionChanged(object? sender, SelectionChangedEventArgs e)
+    private void OnChatHistorySelected(ChatHistoryEntry selected)
     {
-        if (_synchronizingSelections) return;
-        if (ChatHistoryList.SelectedItem is not ChatHistoryEntry selected) return;
-        ClearOtherSelections(ChatHistoryList);
         VM.SelectChatHistory(selected);
         ApplyPaneVisibility();
     }
 
-    private async void OnRefreshDataSourceFilesClicked(object? sender, RoutedEventArgs e)
+    private async void OnRefreshDataSourceFilesRequested()
         => await VM.RefreshSelectedDataSourceFilesAsync();
 
-    private async void OnLoadMoreDataSourceFilesClicked(object? sender, RoutedEventArgs e)
+    private async void OnLoadMoreDataSourceFilesRequested()
         => await VM.LoadMoreSelectedDataSourceFilesAsync();
 
-    private async void OnDataSourceFilesScrollChanged(object? sender, ScrollChangedEventArgs e)
+    private void OnIndexedFileSelected(SearchResult selected)
     {
-        if (sender is not ScrollViewer scrollViewer)
-            return;
-
-        if (scrollViewer.Extent.Height <= 0)
-            return;
-
-        var nearBottom = scrollViewer.Offset.Y + scrollViewer.Viewport.Height >= scrollViewer.Extent.Height - 80;
-        if (nearBottom)
-            await VM.LoadMoreSelectedDataSourceFilesAsync();
-    }
-
-    private void OnDataSourceIndexedFilesSelectionChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        if (sender is not ListBox listBox)
-            return;
-
-        if (listBox.SelectedItem is not SearchResult selected)
-            return;
-
         VM.SelectIndexedFile(selected);
-        listBox.SelectedItem = null;
         ApplyPaneVisibility();
     }
 
-    private void OnBackToPreviousPaneClicked(object? sender, RoutedEventArgs e)
+    private void OnBackRequested()
     {
         VM.GoBack();
         ApplyPaneVisibility();
     }
 
-    private async void OnRerunSearchHistoryClicked(object? sender, RoutedEventArgs e)
+    private async void OnRerunSearchHistoryRequested()
     {
         await VM.RerunSelectedSearchHistoryAsync();
         ApplyPaneVisibility();
     }
 
-    private void OnReuseChatPromptClicked(object? sender, RoutedEventArgs e)
+    private void OnReuseChatPromptRequested()
     {
         VM.ReuseSelectedChatPrompt();
         ApplyPaneVisibility();
     }
 
-    private void OnNewSearchClicked(object? sender, RoutedEventArgs e)
+    private void OnNewSearchRequested()
     {
-        ClearOtherSelections(null);
+        LeftNavPanel.ClearSelections();
         VM.StartNewSearch();
         ApplyPaneVisibility();
     }
 
-    private void OnNewChatClicked(object? sender, RoutedEventArgs e)
+    private void OnNewChatRequested()
     {
-        ClearOtherSelections(null);
+        LeftNavPanel.ClearSelections();
         VM.StartNewChat();
         ApplyPaneVisibility();
     }
 
-    private void OnOpenSettingsClicked(object? sender, RoutedEventArgs e)
+    private void OnOpenSettingsRequested()
     {
-        ClearOtherSelections(null);
+        LeftNavPanel.ClearSelections();
         VM.SelectSettings();
         ApplyPaneVisibility();
     }
@@ -247,21 +228,6 @@ public partial class MainWindow : Window
     {
         base.OnDataContextChanged(e);
         HookVm();
-    }
-
-    private void ClearOtherSelections(ListBox? keep)
-    {
-        _synchronizingSelections = true;
-        try
-        {
-            if (keep != DataSourcesList) DataSourcesList.SelectedItem = null;
-            if (keep != SearchHistoryList) SearchHistoryList.SelectedItem = null;
-            if (keep != ChatHistoryList) ChatHistoryList.SelectedItem = null;
-        }
-        finally
-        {
-            _synchronizingSelections = false;
-        }
     }
 
     protected override void OnClosing(WindowClosingEventArgs e)
@@ -326,16 +292,5 @@ public partial class MainWindow : Window
     {
         HookVm();
         ApplyPaneVisibility();
-        ApplyDataSourcesSectionState();
-    }
-
-    private void ApplyDataSourcesSectionState()
-    {
-        if (DataSourcesSectionPanel is null)
-            return;
-
-        DataSourcesSectionPanel.MaxHeight = _isDataSourcesExpanded ? 1200 : 0;
-        DataSourcesSectionPanel.Opacity = _isDataSourcesExpanded ? 1 : 0;
-        DataSourcesSectionPanel.IsHitTestVisible = _isDataSourcesExpanded;        
     }
 }

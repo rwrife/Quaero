@@ -1,0 +1,55 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Quaero.UI.Views.Panes.SettingsPaneView">
+    <ScrollViewer DataContext="{Binding SettingsVM}">
+        <StackPanel Spacing="12">
+            <TextBlock Text="Settings" FontSize="28" FontWeight="SemiBold" />
+
+            <Border Background="#F4F8FE" BorderBrush="#D7E2F2" BorderThickness="1" CornerRadius="10" Padding="14">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Indexer Service" FontSize="18" FontWeight="SemiBold" />
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button Content="{Binding StartStopButtonText}" Click="OnToggleIndexerClicked" />
+                        <Border Background="#E3ECFA" Padding="8,4" CornerRadius="6">
+                            <TextBlock Text="{Binding IndexerStatusText}" />
+                        </Border>
+                    </StackPanel>
+                    <TextBlock Text="Indexer Output" FontWeight="SemiBold" />
+                    <Border Background="#152131" CornerRadius="6" Padding="10" MaxHeight="220">
+                        <ScrollViewer>
+                            <TextBlock Text="{Binding IndexerOutput}" FontFamily="Consolas"
+                                       Foreground="#D5E2F3" FontSize="11" TextWrapping="Wrap" />
+                        </ScrollViewer>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <Border Background="#F4F8FE" BorderBrush="#D7E2F2" BorderThickness="1" CornerRadius="10" Padding="14">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Paths" FontSize="18" FontWeight="SemiBold" />
+                    <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto,Auto">
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Database" FontWeight="SemiBold" />
+                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding DatabasePath}" TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Plugins" FontWeight="SemiBold" Margin="0,6,0,0" />
+                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding PluginsDirectory}" Margin="0,6,0,0" TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Data Sources Config" FontWeight="SemiBold" Margin="0,6,0,0" />
+                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding DataSourcesConfigPath}" Margin="0,6,0,0" TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Indexer Executable" FontWeight="SemiBold" Margin="0,6,0,0" />
+                        <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding IndexerExePath}" Margin="0,6,0,0" TextWrapping="Wrap" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border Background="#F4F8FE" BorderBrush="#D7E2F2" BorderThickness="1" CornerRadius="10" Padding="14">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Index Maintenance" FontSize="18" FontWeight="SemiBold" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="Compact Index" Click="OnCompactClicked" />
+                        <Button Content="Index All Now" Click="OnIndexAllClicked" />
+                        <Button Content="Refresh Sources" Click="OnRefreshClicked" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
