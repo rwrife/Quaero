@@ -13,11 +13,13 @@ namespace Quaero.UI.Views;
 public partial class MainWindow : Window
 {
     private bool _synchronizingSelections;
+    private bool _isDataSourcesExpanded;
 
     public MainWindow()
     {
         InitializeComponent();
         RequestedThemeVariant = ThemeVariant.Light;
+        DataSourcesHeaderButton.Click += OnDataSourcesHeaderClicked;
         Opened += OnOpened;
     }
 
@@ -144,6 +146,12 @@ public partial class MainWindow : Window
         ClearOtherSelections(DataSourcesList);
         await VM.SelectDataSourceAsync(selected);
         ApplyPaneVisibility();
+    }
+
+    private void OnDataSourcesHeaderClicked(object? sender, RoutedEventArgs e)
+    {
+        _isDataSourcesExpanded = !_isDataSourcesExpanded;
+        ApplyDataSourcesSectionState();
     }
 
     private void OnSearchHistorySelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -318,5 +326,16 @@ public partial class MainWindow : Window
     {
         HookVm();
         ApplyPaneVisibility();
+        ApplyDataSourcesSectionState();
+    }
+
+    private void ApplyDataSourcesSectionState()
+    {
+        if (DataSourcesSectionPanel is null)
+            return;
+
+        DataSourcesSectionPanel.MaxHeight = _isDataSourcesExpanded ? 1200 : 0;
+        DataSourcesSectionPanel.Opacity = _isDataSourcesExpanded ? 1 : 0;
+        DataSourcesSectionPanel.IsHitTestVisible = _isDataSourcesExpanded;        
     }
 }
