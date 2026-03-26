@@ -1,0 +1,76 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Quaero.UI.Views.EditDataSourceDialog"
+        Title="{Binding DialogTitle}"
+        Width="550" Height="500"
+        MinWidth="450" MinHeight="400"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+
+    <DockPanel Margin="16">
+        <!-- Bottom buttons -->
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right"
+                    Spacing="8" Margin="0,12,0,0">
+            <Button Content="Cancel" Click="OnCancelClicked" Padding="16,6" />
+            <Button Content="Save" Click="OnSaveClicked" Padding="16,6" />
+        </StackPanel>
+
+        <ScrollViewer>
+            <StackPanel Spacing="12">
+                <!-- Name -->
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Name" FontWeight="SemiBold" />
+                    <TextBox Text="{Binding Name, Mode=TwoWay}" Watermark="My Data Source" />
+                </StackPanel>
+
+                <!-- Plugin type selector (only for new) -->
+                <StackPanel Spacing="4" IsVisible="{Binding IsNew}">
+                    <TextBlock Text="Plugin Type" FontWeight="SemiBold" />
+                    <ComboBox ItemsSource="{Binding AvailablePluginTypes}"
+                              SelectedItem="{Binding SelectedPluginType}"
+                              PlaceholderText="Select a plugin...">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel>
+                                    <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding Metadata.Description}" FontSize="11" Foreground="#888"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </StackPanel>
+
+                <!-- Plugin name (read-only for edit) -->
+                <StackPanel Spacing="4" IsVisible="{Binding !IsNew}">
+                    <TextBlock Text="Plugin Type" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding SelectedPluginType.DisplayName}" Foreground="#666" />
+                </StackPanel>
+
+                <!-- Cron schedule -->
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Schedule (Cron)" FontWeight="SemiBold" />
+                    <TextBox Text="{Binding CronSchedule, Mode=TwoWay}" Watermark="0 * * * *"
+                             FontFamily="Consolas" />
+                    <TextBlock Text="5-field cron: minute hour day month weekday (e.g. '0 */6 * * *' = every 6 hours)"
+                               FontSize="11" Foreground="#888" TextWrapping="Wrap" />
+                </StackPanel>
+
+                <!-- Dynamic plugin settings -->
+                <ItemsControl ItemsSource="{Binding SettingFields}" IsVisible="{Binding HasPlugin}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Spacing="4" Margin="0,4">
+                                <TextBlock FontWeight="SemiBold" Text="{Binding DisplayName}" />
+                                <TextBox Text="{Binding Value, Mode=TwoWay}"
+                                         Watermark="{Binding Description}" />
+                                <TextBlock Text="{Binding Description}" FontSize="11" Foreground="#888"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</Window>
