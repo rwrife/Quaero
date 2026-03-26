@@ -32,9 +32,11 @@ public class MainWindowViewModel : INotifyPropertyChanged
         _pluginLoader.DiscoverPlugins();
 
         DataSourcesVM = new DataSourcesViewModel(_dataSourceStore, _indexingService, _store, _pluginLoader);
+        SettingsVM = new SettingsViewModel(config);
     }
 
     public DataSourcesViewModel DataSourcesVM { get; }
+    public SettingsViewModel SettingsVM { get; }
 
     public string SearchText
     {

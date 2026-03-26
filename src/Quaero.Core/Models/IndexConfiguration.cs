@@ -14,13 +14,23 @@ public class IndexConfiguration
 
     /// <summary>
     /// Directory where plugin assemblies are loaded from.
-    /// Override with QUAERO_PLUGINS_DIR environment variable for debugging.
+    /// Resolution order: QUAERO_PLUGINS_DIR env var → plugins/ next to exe → %LocalAppData%/Quaero/plugins
     /// </summary>
-    public string PluginsDirectory { get; set; } =
-        Environment.GetEnvironmentVariable("QUAERO_PLUGINS_DIR")
-        ?? Path.Combine(
+    public string PluginsDirectory { get; set; } = ResolvePluginsDirectory();
+
+    private static string ResolvePluginsDirectory()
+    {
+        var envOverride = Environment.GetEnvironmentVariable("QUAERO_PLUGINS_DIR");
+        if (!string.IsNullOrEmpty(envOverride)) return envOverride;
+
+        // Check for bundled plugins/ folder alongside the executable
+        var bundled = Path.Combine(AppContext.BaseDirectory, "plugins");
+        if (Directory.Exists(bundled)) return bundled;
+
+        return Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "Quaero", "plugins");
+    }
 
     public int IndexIntervalMinutes { get; set; } = 30;
 }

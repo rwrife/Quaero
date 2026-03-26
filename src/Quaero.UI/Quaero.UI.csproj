@@ -15,15 +15,78 @@
     <PackageReference Include="Avalonia.Desktop" Version="11.2.7" />
     <PackageReference Include="Avalonia.Fonts.Inter" Version="11.2.7" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.2.7" />
+    <PackageReference Include="MimeKit" Version="4.10.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Quaero.Core\Quaero.Core.csproj" />
     <ProjectReference Include="..\Quaero.Plugins.Abstractions\Quaero.Plugins.Abstractions.csproj" />
-    <ProjectReference Include="..\Quaero.Plugins.Markdown\Quaero.Plugins.Markdown.csproj" />
-    <ProjectReference Include="..\Quaero.Plugins.Text\Quaero.Plugins.Text.csproj" />
-    <ProjectReference Include="..\Quaero.Plugins.Json\Quaero.Plugins.Json.csproj" />
-    <ProjectReference Include="..\Quaero.Plugins.Imap\Quaero.Plugins.Imap.csproj" />
   </ItemGroup>
+
+  <!--
+    Bundle the Indexer exe and plugin DLLs into the UI output so the UI
+    can launch the indexer and discover plugins without external setup.
+    Layout:
+      bin/Debug/net10.0/
+        Quaero.UI.exe
+        indexer/          ← Indexer exe + deps
+        plugins/          ← Plugin DLLs + deps
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\Quaero.Indexer\Quaero.Indexer.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <Private>false</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Quaero.Plugins.Markdown\Quaero.Plugins.Markdown.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <Private>false</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Quaero.Plugins.Text\Quaero.Plugins.Text.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <Private>false</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Quaero.Plugins.Json\Quaero.Plugins.Json.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <Private>false</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Quaero.Plugins.Imap\Quaero.Plugins.Imap.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <Private>false</Private>
+    </ProjectReference>
+  </ItemGroup>
+
+  <Target Name="BundleIndexerAndPlugins" AfterTargets="Build">
+    <!-- Copy Indexer output into indexer/ subfolder -->
+    <PropertyGroup>
+      <IndexerOutputDir>..\Quaero.Indexer\bin\$(Configuration)\$(TargetFramework)\</IndexerOutputDir>
+      <BundledIndexerDir>$(OutputPath)indexer\</BundledIndexerDir>
+      <BundledPluginsDir>$(OutputPath)plugins\</BundledPluginsDir>
+    </PropertyGroup>
+    <MakeDir Directories="$(BundledIndexerDir)" />
+    <MakeDir Directories="$(BundledPluginsDir)" />
+
+    <ItemGroup>
+      <IndexerFiles Include="$(IndexerOutputDir)**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(IndexerFiles)"
+          DestinationFolder="$(BundledIndexerDir)%(RecursiveDir)"
+          SkipUnchangedFiles="true" />
+
+    <!-- Copy plugin outputs into plugins/ subfolder (reuse artifacts if available) -->
+    <ItemGroup>
+      <PluginProjectDirs Include=
+        "..\Quaero.Plugins.Markdown\bin\$(Configuration)\$(TargetFramework)\;
+         ..\Quaero.Plugins.Text\bin\$(Configuration)\$(TargetFramework)\;
+         ..\Quaero.Plugins.Json\bin\$(Configuration)\$(TargetFramework)\;
+         ..\Quaero.Plugins.Imap\bin\$(Configuration)\$(TargetFramework)\" />
+    </ItemGroup>
+    <ItemGroup>
+      <AllPluginFiles Include="%(PluginProjectDirs.Identity)**\*.*"
+                      Exclude="%(PluginProjectDirs.Identity)**\Quaero.Plugins.Abstractions.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(AllPluginFiles)"
+          DestinationFolder="$(BundledPluginsDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
 
 </Project>

@@ -81,4 +81,13 @@ public partial class MainWindow : Window
 
     private void OnRefreshClicked(object? sender, RoutedEventArgs e)
         => VM.DataSourcesVM.RefreshDataSources();
+
+    private void OnToggleIndexerClicked(object? sender, RoutedEventArgs e)
+        => VM.SettingsVM.ToggleIndexer();
+
+    protected override void OnClosing(WindowClosingEventArgs e)
+    {
+        VM.SettingsVM.Shutdown();
+        base.OnClosing(e);
+    }
 }
