@@ -6,12 +6,26 @@
 
   <ItemGroup>
     <PackageReference Include="Markdig" Version="0.38.0" />
+    <PackageReference Include="Microsoft.Extensions.FileSystemGlobbing" Version="9.0.3" />
   </ItemGroup>
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
   </PropertyGroup>
+
+  <!-- Copy plugin output to shared plugins folder for debugging -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <PluginsOutputDir>$(MSBuildThisFileDirectory)..\..\artifacts\plugins\</PluginsOutputDir>
+  </PropertyGroup>
+  <Target Name="CopyToPluginsFolder" AfterTargets="Build" Condition="'$(Configuration)' == 'Debug'">
+    <MakeDir Directories="$(PluginsOutputDir)" />
+    <ItemGroup>
+      <PluginFiles Include="$(OutputPath)**\*.*" Exclude="$(OutputPath)**\Quaero.Plugins.Abstractions.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(PluginFiles)" DestinationFolder="$(PluginsOutputDir)" SkipUnchangedFiles="true" />
+  </Target>
 
 </Project>

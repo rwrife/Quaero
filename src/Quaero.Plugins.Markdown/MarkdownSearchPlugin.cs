@@ -10,55 +10,82 @@ namespace Quaero.Plugins.Markdown;
 
 public class MarkdownSearchPlugin : ISearchPlugin
 {
-    private readonly List<string> _directories = new();
+    private string _directory = string.Empty;
+    private string _fileGlob = "**/*.md";
+    private DateTime? _lastSuccessfulRun;
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().Build();
 
     public PluginMetadata Metadata => new()
     {
         Id = "quaero.plugins.markdown",
         Name = "Markdown Files",
-        Description = "Indexes Markdown (.md) files from configured directories",
+        Description = "Indexes Markdown (.md) files from a directory using glob patterns. Uses the first heading as the title.",
         Version = "1.0.0",
         SupportedFileExtensions = [".md", ".markdown"]
     };
 
+    public IReadOnlyList<PluginSettingDescriptor> SettingDescriptors =>
+    [
+        new() { Key = "Directory", DisplayName = "Folder Path", Description = "Root folder to scan for Markdown files", SettingType = PluginSettingType.FolderPath, IsRequired = true },
+        new() { Key = "FileGlob", DisplayName = "File Pattern", Description = "Glob pattern for matching files (e.g. **/*.md)", SettingType = PluginSettingType.GlobPattern, DefaultValue = "**/*.md" }
+    ];
+
     public Task InitializeAsync(PluginConfiguration configuration, CancellationToken cancellationToken = default)
     {
-        if (configuration.Settings.TryGetValue("Directories", out var dirs))
-        {
-            _directories.AddRange(dirs.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
-        }
+        if (configuration.Settings.TryGetValue("Directory", out var dir))
+            _directory = dir;
+        // Backwards compat: support old semicolon-separated Directories setting
+        else if (configuration.Settings.TryGetValue("Directories", out var dirs))
+            _directory = dirs.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault() ?? string.Empty;
+
+        if (configuration.Settings.TryGetValue("FileGlob", out var glob) && !string.IsNullOrWhiteSpace(glob))
+            _fileGlob = glob;
+
+        _lastSuccessfulRun = configuration.LastSuccessfulRun;
+
         return Task.CompletedTask;
     }
 
     public async IAsyncEnumerable<DiscoveredDocument> DiscoverDocumentsAsync(
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        foreach (var directory in _directories)
+        if (string.IsNullOrWhiteSpace(_directory) || !Directory.Exists(_directory))
+            yield break;
+
+        var matcher = new Microsoft.Extensions.FileSystemGlobbing.Matcher();
+        matcher.AddInclude(_fileGlob);
+        var result = matcher.Execute(new Microsoft.Extensions.FileSystemGlobbing.Abstractions.DirectoryInfoWrapper(new DirectoryInfo(_directory)));
+
+        foreach (var file in result.Files)
         {
-            if (!Directory.Exists(directory)) continue;
+            if (cancellationToken.IsCancellationRequested) yield break;
 
-            var files = Directory.EnumerateFiles(directory, "*.md", SearchOption.AllDirectories)
-                .Concat(Directory.EnumerateFiles(directory, "*.markdown", SearchOption.AllDirectories));
+            var fullPath = Path.Combine(_directory, file.Path);
 
-            foreach (var file in files)
+            // Incremental: skip files not modified since last successful run
+            if (_lastSuccessfulRun.HasValue)
             {
-                if (cancellationToken.IsCancellationRequested) yield break;
-
-                DiscoveredDocument? doc = null;
                 try
                 {
-                    var content = await File.ReadAllTextAsync(file, cancellationToken);
-                    doc = ParseMarkdown(file, content);
+                    var lastWrite = File.GetLastWriteTimeUtc(fullPath);
+                    if (lastWrite < _lastSuccessfulRun.Value) continue;
                 }
-                catch (Exception)
-                {
-                    // Skip files that can't be read
-                }
-
-                if (doc != null)
-                    yield return doc;
+                catch { continue; }
             }
+
+            DiscoveredDocument? doc = null;
+            try
+            {
+                var content = await File.ReadAllTextAsync(fullPath, cancellationToken);
+                doc = ParseMarkdown(fullPath, content);
+            }
+            catch (Exception)
+            {
+                // Skip files that can't be read
+            }
+
+            if (doc != null)
+                yield return doc;
         }
     }
 

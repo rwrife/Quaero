@@ -56,6 +56,19 @@ public class IndexStore : IDisposable
             CREATE INDEX IF NOT EXISTS idx_documents_type ON documents(type);
             CREATE INDEX IF NOT EXISTS idx_documents_machine ON documents(machine);
             CREATE INDEX IF NOT EXISTS idx_documents_hash ON documents(content_hash);
+
+            CREATE TABLE IF NOT EXISTS index_run_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                data_source_id TEXT NOT NULL,
+                started_at TEXT NOT NULL,
+                completed_at TEXT,
+                status TEXT NOT NULL DEFAULT 'Indexing',
+                document_count INTEGER NOT NULL DEFAULT 0,
+                error_message TEXT
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_run_log_ds ON index_run_log(data_source_id);
+            CREATE INDEX IF NOT EXISTS idx_run_log_status ON index_run_log(data_source_id, status);
             """;
         cmd.ExecuteNonQuery();
 
@@ -226,6 +239,104 @@ public class IndexStore : IDisposable
         using var cmd = _connection.CreateCommand();
         cmd.CommandText = "VACUUM;";
         cmd.ExecuteNonQuery();
+    }
+
+    // --- Index Run Log ---
+
+    public async Task<long> StartRunLogAsync(string dataSourceId, CancellationToken ct = default)
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO index_run_log (data_source_id, started_at, status)
+            VALUES ($dsId, $started, 'Indexing');
+            SELECT last_insert_rowid();
+            """;
+        cmd.Parameters.AddWithValue("$dsId", dataSourceId);
+        cmd.Parameters.AddWithValue("$started", DateTime.UtcNow.ToString("O"));
+        var result = await cmd.ExecuteScalarAsync(ct);
+        return Convert.ToInt64(result);
+    }
+
+    public async Task CompleteRunLogAsync(long logId, DataSourceStatus status, int documentCount, string? error = null, CancellationToken ct = default)
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = """
+            UPDATE index_run_log
+            SET completed_at = $completed, status = $status, document_count = $docCount, error_message = $error
+            WHERE id = $id;
+            """;
+        cmd.Parameters.AddWithValue("$id", logId);
+        cmd.Parameters.AddWithValue("$completed", DateTime.UtcNow.ToString("O"));
+        cmd.Parameters.AddWithValue("$status", status.ToString());
+        cmd.Parameters.AddWithValue("$docCount", documentCount);
+        cmd.Parameters.AddWithValue("$error", (object?)error ?? DBNull.Value);
+        await cmd.ExecuteNonQueryAsync(ct);
+    }
+
+    public async Task<DateTime?> GetLastSuccessfulRunAsync(string dataSourceId, CancellationToken ct = default)
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = """
+            SELECT completed_at FROM index_run_log
+            WHERE data_source_id = $dsId AND status = 'Success'
+            ORDER BY completed_at DESC LIMIT 1;
+            """;
+        cmd.Parameters.AddWithValue("$dsId", dataSourceId);
+        var result = await cmd.ExecuteScalarAsync(ct);
+        if (result is string s)
+            return DateTime.Parse(s);
+        return null;
+    }
+
+    public async Task<IndexRunLog?> GetLatestRunAsync(string dataSourceId, CancellationToken ct = default)
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = """
+            SELECT id, data_source_id, started_at, completed_at, status, document_count, error_message
+            FROM index_run_log WHERE data_source_id = $dsId
+            ORDER BY started_at DESC LIMIT 1;
+            """;
+        cmd.Parameters.AddWithValue("$dsId", dataSourceId);
+        using var reader = await cmd.ExecuteReaderAsync(ct);
+        if (await reader.ReadAsync(ct))
+            return ReadRunLog(reader);
+        return null;
+    }
+
+    public async Task<List<IndexRunLog>> GetRunHistoryAsync(string dataSourceId, int limit = 20, CancellationToken ct = default)
+    {
+        var logs = new List<IndexRunLog>();
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = """
+            SELECT id, data_source_id, started_at, completed_at, status, document_count, error_message
+            FROM index_run_log WHERE data_source_id = $dsId
+            ORDER BY started_at DESC LIMIT $limit;
+            """;
+        cmd.Parameters.AddWithValue("$dsId", dataSourceId);
+        cmd.Parameters.AddWithValue("$limit", limit);
+        using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+            logs.Add(ReadRunLog(reader));
+        return logs;
+    }
+
+    private static IndexRunLog ReadRunLog(SqliteDataReader reader)
+    {
+        var completedStr = reader.IsDBNull(reader.GetOrdinal("completed_at"))
+            ? null : reader.GetString(reader.GetOrdinal("completed_at"));
+        var errorStr = reader.IsDBNull(reader.GetOrdinal("error_message"))
+            ? null : reader.GetString(reader.GetOrdinal("error_message"));
+
+        return new IndexRunLog
+        {
+            Id = reader.GetInt64(reader.GetOrdinal("id")),
+            DataSourceId = reader.GetString(reader.GetOrdinal("data_source_id")),
+            StartedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("started_at"))),
+            CompletedAt = completedStr != null ? DateTime.Parse(completedStr) : null,
+            Status = Enum.Parse<DataSourceStatus>(reader.GetString(reader.GetOrdinal("status"))),
+            DocumentCount = reader.GetInt32(reader.GetOrdinal("document_count")),
+            ErrorMessage = errorStr
+        };
     }
 
     private IndexedDocument ReadDocument(SqliteDataReader reader)

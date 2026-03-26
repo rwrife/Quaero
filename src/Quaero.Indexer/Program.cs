@@ -5,11 +5,6 @@ using Microsoft.Extensions.Logging;
 using Quaero.Core.Models;
 using Quaero.Core.Services;
 using Quaero.Core.Storage;
-using Quaero.Plugins.Abstractions;
-using Quaero.Plugins.Imap;
-using Quaero.Plugins.Json;
-using Quaero.Plugins.Markdown;
-using Quaero.Plugins.Text;
 
 namespace Quaero.Indexer;
 
@@ -20,8 +15,13 @@ public class Program
         var host = Host.CreateDefaultBuilder(args)
             .ConfigureServices((context, services) =>
             {
-                services.AddSingleton(LoadConfiguration());
+                var config = LoadConfiguration();
+                services.AddSingleton(config);
                 services.AddSingleton<IndexStore>();
+                services.AddSingleton<DataSourceStore>();
+                services.AddSingleton(sp => new PluginLoader(
+                    config.PluginsDirectory,
+                    sp.GetRequiredService<ILogger<PluginLoader>>()));
                 services.AddSingleton<IndexingService>();
                 services.AddHostedService<IndexingBackgroundService>();
             })
@@ -50,71 +50,44 @@ public class IndexingBackgroundService : BackgroundService
 {
     private readonly IndexingService _indexingService;
     private readonly IndexConfiguration _config;
+    private readonly PluginLoader _pluginLoader;
     private readonly ILogger<IndexingBackgroundService> _logger;
 
     public IndexingBackgroundService(
         IndexingService indexingService,
         IndexConfiguration config,
+        PluginLoader pluginLoader,
         ILogger<IndexingBackgroundService> logger)
     {
         _indexingService = indexingService;
         _config = config;
+        _pluginLoader = pluginLoader;
         _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("Quaero Indexer starting...");
-        RegisterBuiltInPlugins();
+        _logger.LogInformation("Plugins directory: {Dir}", _config.PluginsDirectory);
+        _logger.LogInformation("Discovering available plugins...");
 
+        var discovered = _pluginLoader.DiscoverPlugins();
+        _logger.LogInformation("Found {Count} plugin type(s) in plugins folder", discovered.Count);
+
+        // Main scheduling loop — evaluate cron schedules every minute
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                await _indexingService.RunIndexingAsync(stoppingToken);
+                await _indexingService.EvaluateAndRunAsync(stoppingToken);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger.LogError(ex, "Error during indexing run");
+                _logger.LogError(ex, "Error during indexing evaluation");
             }
 
-            _logger.LogInformation("Next indexing run in {Minutes} minutes", _config.IndexIntervalMinutes);
-            await Task.Delay(TimeSpan.FromMinutes(_config.IndexIntervalMinutes), stoppingToken);
-        }
-    }
-
-    private void RegisterBuiltInPlugins()
-    {
-        var pluginConfigPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Quaero", "plugins.json");
-
-        var pluginConfigs = new Dictionary<string, PluginConfiguration>();
-        if (File.Exists(pluginConfigPath))
-        {
-            var json = File.ReadAllText(pluginConfigPath);
-            pluginConfigs = JsonSerializer.Deserialize<Dictionary<string, PluginConfiguration>>(json) ?? new();
-        }
-
-        var plugins = new ISearchPlugin[]
-        {
-            new MarkdownSearchPlugin(),
-            new TextSearchPlugin(),
-            new JsonSearchPlugin(),
-            new ImapSearchPlugin()
-        };
-
-        foreach (var plugin in plugins)
-        {
-            var config = pluginConfigs.GetValueOrDefault(plugin.Metadata.Id) ?? new PluginConfiguration();
-            if (!config.Enabled)
-            {
-                _logger.LogInformation("Plugin {Name} is disabled, skipping", plugin.Metadata.Name);
-                continue;
-            }
-
-            plugin.InitializeAsync(config).GetAwaiter().GetResult();
-            _indexingService.RegisterPlugin(plugin);
+            // Check schedules every minute
+            await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
         }
     }
 }

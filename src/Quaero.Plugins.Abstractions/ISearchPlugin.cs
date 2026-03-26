@@ -11,6 +11,11 @@ public interface ISearchPlugin
     PluginMetadata Metadata { get; }
 
     /// <summary>
+    /// Describes the settings this plugin accepts, used by the UI to render config forms.
+    /// </summary>
+    IReadOnlyList<PluginSettingDescriptor> SettingDescriptors { get; }
+
+    /// <summary>
     /// Initializes the plugin with its configuration.
     /// </summary>
     Task InitializeAsync(PluginConfiguration configuration, CancellationToken cancellationToken = default);

@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Quaero.UI": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "QUAERO_PLUGINS_DIR": "../../artifacts/plugins"
+      }
+    }
+  }
+}
