@@ -6,6 +6,7 @@ namespace Quaero.Core.Models;
 public class SearchQuery
 {
     public string QueryText { get; set; } = string.Empty;
+    public string? DataSourceId { get; set; }
     public string? Provider { get; set; }
     public string? Type { get; set; }
     public string? Machine { get; set; }

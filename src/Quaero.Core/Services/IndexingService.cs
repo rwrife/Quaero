@@ -126,6 +126,9 @@ public class IndexingService
                     IndexedAt = DateTime.UtcNow
                 };
 
+                doc.ExtendedData["DataSourceId"] = ds.Id;
+                doc.ExtendedData["DataSourceName"] = ds.Name;
+
                 await _store.UpsertDocumentAsync(doc, ct);
                 docCount++;
             }

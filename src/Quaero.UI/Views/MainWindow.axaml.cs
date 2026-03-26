@@ -31,21 +31,30 @@ public partial class MainWindow : Window
 
     private async void OnAddDataSourceClicked(object? sender, RoutedEventArgs e)
     {
-        var plugins = VM.DataSourcesVM.AvailablePluginTypes;
-        if (plugins.Count == 0)
+        try
         {
-            VM.StatusText = "No plugins found in the plugins folder. Place plugin DLLs there first.";
-            return;
-        }
+            var plugins = VM.DataSourcesVM.AvailablePluginTypes;
+            VM.StatusText = $"DEBUG: Found {plugins.Count} plugins";
+            
+            if (plugins.Count == 0)
+            {
+                VM.StatusText = "No plugins found in the plugins folder. Place plugin DLLs there first.";
+                return;
+            }
 
-        var editVM = new EditDataSourceViewModel(plugins);
-        var dialog = new EditDataSourceDialog { DataContext = editVM };
-        var result = await dialog.ShowDialog<bool>(this);
-        if (result)
+            var editVM = new EditDataSourceViewModel(plugins);
+            var dialog = new EditDataSourceDialog { DataContext = editVM };
+            var result = await dialog.ShowDialog<bool>(this);
+            if (result)
+            {
+                var source = editVM.ToDataSource();
+                VM.DataSourcesVM.AddDataSource(source);
+                VM.StatusText = $"Added data source: {editVM.Name}";
+            }
+        }
+        catch (Exception ex)
         {
-            var source = editVM.ToDataSource();
-            VM.DataSourcesVM.AddDataSource(source);
-            VM.StatusText = $"Added data source: {editVM.Name}";
+            VM.StatusText = $"ERROR: {ex.Message}";
         }
     }
 
@@ -74,12 +83,12 @@ public partial class MainWindow : Window
         VM.StatusText = $"Removed data source: {selected.Name}";
     }
 
-    private void OnToggleDataSourceClicked(object? sender, RoutedEventArgs e)
+    private async void OnToggleDataSourceClicked(object? sender, RoutedEventArgs e)
     {
         var selected = VM.DataSourcesVM.SelectedDataSource;
         if (selected == null) return;
         VM.DataSourcesVM.ToggleDataSource(selected.Id);
-        VM.SelectDataSource(VM.DataSourcesVM.DataSources.FirstOrDefault(ds => ds.Id == selected.Id));
+        await VM.SelectDataSourceAsync(VM.DataSourcesVM.DataSources.FirstOrDefault(ds => ds.Id == selected.Id));
     }
 
     private async void OnRunSelectedClicked(object? sender, RoutedEventArgs e)
@@ -87,7 +96,7 @@ public partial class MainWindow : Window
         var selected = VM.DataSourcesVM.SelectedDataSource;
         if (selected == null) return;
         await VM.DataSourcesVM.RunSingleDataSourceAsync(selected.Id);
-        await VM.RefreshIndexedFilesAsync();
+        await VM.RefreshSelectedDataSourceFilesAsync();
     }
 
     private async void OnRunAllClicked(object? sender, RoutedEventArgs e)
@@ -96,7 +105,7 @@ public partial class MainWindow : Window
     private async void OnRefreshClicked(object? sender, RoutedEventArgs e)
     {
         VM.DataSourcesVM.RefreshDataSources();
-        await VM.RefreshIndexedFilesAsync();
+        await VM.RefreshSelectedDataSourceFilesAsync();
     }
 
     private void OnToggleIndexerClicked(object? sender, RoutedEventArgs e)
@@ -128,20 +137,13 @@ public partial class MainWindow : Window
         ApplyPaneVisibility();
     }
 
-    private void OnDataSourcesSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    private async void OnDataSourcesSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (_synchronizingSelections) return;
         if (DataSourcesList.SelectedItem is not DataSourceItemViewModel selected) return;
         ClearOtherSelections(DataSourcesList);
-        VM.SelectDataSource(selected);
-    }
-
-    private void OnIndexedFilesSelectionChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        if (_synchronizingSelections) return;
-        if (IndexedFilesList.SelectedItem is not SearchResult selected) return;
-        ClearOtherSelections(IndexedFilesList);
-        VM.SelectIndexedFile(selected);
+        await VM.SelectDataSourceAsync(selected);
+        ApplyPaneVisibility();
     }
 
     private void OnSearchHistorySelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -150,6 +152,7 @@ public partial class MainWindow : Window
         if (SearchHistoryList.SelectedItem is not SearchHistoryEntry selected) return;
         ClearOtherSelections(SearchHistoryList);
         VM.SelectSearchHistory(selected);
+        ApplyPaneVisibility();
     }
 
     private void OnChatHistorySelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -158,10 +161,46 @@ public partial class MainWindow : Window
         if (ChatHistoryList.SelectedItem is not ChatHistoryEntry selected) return;
         ClearOtherSelections(ChatHistoryList);
         VM.SelectChatHistory(selected);
+        ApplyPaneVisibility();
     }
 
-    private async void OnRefreshIndexedFilesClicked(object? sender, RoutedEventArgs e)
-        => await VM.RefreshIndexedFilesAsync();
+    private async void OnRefreshDataSourceFilesClicked(object? sender, RoutedEventArgs e)
+        => await VM.RefreshSelectedDataSourceFilesAsync();
+
+    private async void OnLoadMoreDataSourceFilesClicked(object? sender, RoutedEventArgs e)
+        => await VM.LoadMoreSelectedDataSourceFilesAsync();
+
+    private async void OnDataSourceFilesScrollChanged(object? sender, ScrollChangedEventArgs e)
+    {
+        if (sender is not ScrollViewer scrollViewer)
+            return;
+
+        if (scrollViewer.Extent.Height <= 0)
+            return;
+
+        var nearBottom = scrollViewer.Offset.Y + scrollViewer.Viewport.Height >= scrollViewer.Extent.Height - 80;
+        if (nearBottom)
+            await VM.LoadMoreSelectedDataSourceFilesAsync();
+    }
+
+    private void OnDataSourceIndexedFilesSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (sender is not ListBox listBox)
+            return;
+
+        if (listBox.SelectedItem is not SearchResult selected)
+            return;
+
+        VM.SelectIndexedFile(selected);
+        listBox.SelectedItem = null;
+        ApplyPaneVisibility();
+    }
+
+    private void OnBackToPreviousPaneClicked(object? sender, RoutedEventArgs e)
+    {
+        VM.GoBack();
+        ApplyPaneVisibility();
+    }
 
     private async void OnRerunSearchHistoryClicked(object? sender, RoutedEventArgs e)
     {
@@ -208,7 +247,6 @@ public partial class MainWindow : Window
         try
         {
             if (keep != DataSourcesList) DataSourcesList.SelectedItem = null;
-            if (keep != IndexedFilesList) IndexedFilesList.SelectedItem = null;
             if (keep != SearchHistoryList) SearchHistoryList.SelectedItem = null;
             if (keep != ChatHistoryList) ChatHistoryList.SelectedItem = null;
         }

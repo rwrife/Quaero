@@ -159,6 +159,11 @@ public class IndexStore : IDisposable
             sql += " AND d.provider = $provider";
             cmd.Parameters.AddWithValue("$provider", query.Provider);
         }
+        if (query.DataSourceId != null)
+        {
+            sql += " AND json_extract(d.extended_data, '$.DataSourceId') = $dataSourceId";
+            cmd.Parameters.AddWithValue("$dataSourceId", query.DataSourceId);
+        }
         if (query.Type != null)
         {
             sql += " AND d.type = $type";
@@ -219,6 +224,38 @@ public class IndexStore : IDisposable
     {
         using var cmd = _connection.CreateCommand();
         cmd.CommandText = "SELECT COUNT(*) FROM documents";
+        var result = await cmd.ExecuteScalarAsync(cancellationToken);
+        return Convert.ToInt32(result);
+    }
+
+    public async Task<int> GetDocumentCountAsync(SearchQuery query, CancellationToken cancellationToken = default)
+    {
+        using var cmd = _connection.CreateCommand();
+
+        var sql = "SELECT COUNT(*) FROM documents d WHERE 1=1";
+
+        if (query.Provider != null)
+        {
+            sql += " AND d.provider = $provider";
+            cmd.Parameters.AddWithValue("$provider", query.Provider);
+        }
+        if (query.DataSourceId != null)
+        {
+            sql += " AND json_extract(d.extended_data, '$.DataSourceId') = $dataSourceId";
+            cmd.Parameters.AddWithValue("$dataSourceId", query.DataSourceId);
+        }
+        if (query.Type != null)
+        {
+            sql += " AND d.type = $type";
+            cmd.Parameters.AddWithValue("$type", query.Type);
+        }
+        if (query.Machine != null)
+        {
+            sql += " AND d.machine = $machine";
+            cmd.Parameters.AddWithValue("$machine", query.Machine);
+        }
+
+        cmd.CommandText = sql;
         var result = await cmd.ExecuteScalarAsync(cancellationToken);
         return Convert.ToInt32(result);
     }

@@ -2,11 +2,46 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using Microsoft.Extensions.Logging;
 using Quaero.Core.Models;
 using Quaero.Core.Services;
 using Quaero.Core.Storage;
 
 namespace Quaero.UI.ViewModels;
+
+/// <summary>
+/// Simple in-memory logger for diagnostics
+/// </summary>
+public class SimpleLogger<T> : ILogger<T>
+{
+    private readonly Action<string> _onLog;
+    private readonly LogLevel _minLevel;
+
+    public SimpleLogger(Action<string> onLog, LogLevel minLevel = LogLevel.Information)
+    {
+        _onLog = onLog;
+        _minLevel = minLevel;
+    }
+
+    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+    public bool IsEnabled(LogLevel logLevel) => logLevel >= _minLevel;
+
+    public void Log<TState>(
+        LogLevel logLevel,
+        EventId eventId,
+        TState state,
+        Exception? exception,
+        Func<TState, Exception?, string> formatter)
+    {
+        if (!IsEnabled(logLevel))
+            return;
+
+        var message = formatter(state, exception);
+        _onLog($"[{logLevel}] {message}");
+        if (exception != null)
+            _onLog($"Exception: {exception.Message}");
+    }
+}
 
 public enum DetailPaneKind
 {
@@ -29,8 +64,16 @@ public class MainWindowViewModel : INotifyPropertyChanged
     private bool _isIndexing;
     private bool _isChatMode;
     private DetailPaneKind _activePane = DetailPaneKind.Workspace;
+    private DetailPaneKind? _previousPane;
     private SearchResult? _selectedResult;
     private DataSourceItemViewModel? _selectedDataSource;
+    private bool _isLoadingDataSourceFiles;
+    private bool _hasMoreDataSourceFiles;
+    private int _dataSourceFilesOffset;
+    private bool _useProviderFallbackForDataSourceFiles;
+    private string? _providerFallbackValue;
+    private bool _useUnfilteredFallbackForDataSourceFiles;
+    private int _selectedDataSourceIndexedItemCount;
     private SearchResult? _selectedIndexedFile;
     private SearchHistoryEntry? _selectedSearchHistory;
     private ChatHistoryEntry? _selectedChatHistory;
@@ -40,13 +83,17 @@ public class MainWindowViewModel : INotifyPropertyChanged
         var config = new IndexConfiguration();
         _store = new IndexStore(config);
         _dataSourceStore = new DataSourceStore();
-        _pluginLoader = new PluginLoader(config.PluginsDirectory,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<PluginLoader>.Instance);
-        _indexingService = new IndexingService(_store, _dataSourceStore, _pluginLoader,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<IndexingService>.Instance);
+        
+        // Create a logger that outputs to StatusText
+        var pluginLogger = new SimpleLogger<PluginLoader>(msg => StatusText = msg, LogLevel.Debug);
+        var indexLogger = new SimpleLogger<IndexingService>(msg => StatusText = msg, LogLevel.Debug);
+        
+        _pluginLoader = new PluginLoader(config.PluginsDirectory, pluginLogger);
+        _indexingService = new IndexingService(_store, _dataSourceStore, _pluginLoader, indexLogger);
 
         // Discover plugins from plugins folder
-        _pluginLoader.DiscoverPlugins();
+        var discovered = _pluginLoader.DiscoverPlugins();
+        StatusText = $"Ready. Found {discovered.Count} plugin(s).";
 
         DataSourcesVM = new DataSourcesViewModel(_dataSourceStore, _indexingService, _store, _pluginLoader);
         SettingsVM = new SettingsViewModel(config);
@@ -137,21 +184,54 @@ public class MainWindowViewModel : INotifyPropertyChanged
     public bool IsSearchHistoryPaneVisible => _activePane == DetailPaneKind.SearchHistory;
     public bool IsChatHistoryPaneVisible => _activePane == DetailPaneKind.ChatHistory;
     public bool IsSettingsPaneVisible => _activePane == DetailPaneKind.Settings;
+    public bool CanGoBack => _previousPane.HasValue;
+
+    public bool IsLoadingDataSourceFiles
+    {
+        get => _isLoadingDataSourceFiles;
+        private set => SetField(ref _isLoadingDataSourceFiles, value);
+    }
+
+    public bool HasMoreDataSourceFiles
+    {
+        get => _hasMoreDataSourceFiles;
+        private set => SetField(ref _hasMoreDataSourceFiles, value);
+    }
+
+    public int SelectedDataSourceIndexedItemCount
+    {
+        get => _selectedDataSourceIndexedItemCount;
+        private set
+        {
+            if (SetField(ref _selectedDataSourceIndexedItemCount, value))
+                OnPropertyChanged(nameof(SelectedDataSourceIndexedItemCountText));
+        }
+    }
+
+    public string SelectedDataSourceIndexedItemCountText => SelectedDataSourceIndexedItemCount.ToString("N0");
 
     public ObservableCollection<SearchResult> IndexedFiles { get; } = new();
+    public ObservableCollection<SearchResult> SelectedDataSourceIndexedFiles { get; } = new();
     public ObservableCollection<SearchHistoryEntry> SearchHistory { get; } = new();
     public ObservableCollection<ChatHistoryEntry> ChatHistory { get; } = new();
     public ObservableCollection<ChatMessageEntry> ChatMessages { get; } = new();
     public ObservableCollection<SearchResult> SearchResults { get; } = new();
 
+    private const int InitialDataSourceFilePageSize = 500;
+    private const int DataSourceFilePageSize = 200;
+
     public void SelectWorkspace(bool useChatMode)
     {
         IsChatMode = useChatMode;
+        _previousPane = null;
+        OnPropertyChanged(nameof(CanGoBack));
         SetActivePane(DetailPaneKind.Workspace);
     }
 
     public void StartNewSearch()
     {
+        _previousPane = null;
+        OnPropertyChanged(nameof(CanGoBack));
         IsChatMode = false;
         PrimaryInputText = string.Empty;
         SearchResults.Clear();
@@ -162,6 +242,8 @@ public class MainWindowViewModel : INotifyPropertyChanged
 
     public void StartNewChat()
     {
+        _previousPane = null;
+        OnPropertyChanged(nameof(CanGoBack));
         IsChatMode = true;
         PrimaryInputText = string.Empty;
         ChatMessages.Clear();
@@ -174,25 +256,40 @@ public class MainWindowViewModel : INotifyPropertyChanged
         StatusText = "New chat started.";
     }
 
-    public void SelectDataSource(DataSourceItemViewModel? dataSource)
+    public async Task SelectDataSourceAsync(DataSourceItemViewModel? dataSource)
     {
         if (dataSource == null) return;
+        _previousPane = null;
+        OnPropertyChanged(nameof(CanGoBack));
         SelectedDataSource = dataSource;
         DataSourcesVM.SelectedDataSource = dataSource;
         SelectedIndexedFile = null;
         SelectedSearchHistory = null;
         SelectedChatHistory = null;
         SetActivePane(DetailPaneKind.DataSource);
+        await LoadSelectedDataSourceFilesAsync(reset: true);
     }
 
     public void SelectIndexedFile(SearchResult? indexedFile)
     {
         if (indexedFile == null) return;
+        _previousPane = _activePane;
+        OnPropertyChanged(nameof(CanGoBack));
         SelectedIndexedFile = indexedFile;
-        SelectedDataSource = null;
         SelectedSearchHistory = null;
         SelectedChatHistory = null;
         SetActivePane(DetailPaneKind.IndexedFile);
+    }
+
+    public void GoBack()
+    {
+        if (!_previousPane.HasValue)
+            return;
+
+        var pane = _previousPane.Value;
+        _previousPane = null;
+        OnPropertyChanged(nameof(CanGoBack));
+        SetActivePane(pane);
     }
 
     public void SelectSearchHistory(SearchHistoryEntry? historyEntry)
@@ -217,6 +314,8 @@ public class MainWindowViewModel : INotifyPropertyChanged
 
     public void SelectSettings()
     {
+        _previousPane = null;
+        OnPropertyChanged(nameof(CanGoBack));
         SelectedDataSource = null;
         SelectedIndexedFile = null;
         SelectedSearchHistory = null;
@@ -315,16 +414,138 @@ public class MainWindowViewModel : INotifyPropertyChanged
 
     public async Task RefreshIndexedFilesAsync()
     {
+        if (SelectedDataSource != null)
+            await LoadSelectedDataSourceFilesAsync(reset: true);
+    }
+
+    public async Task RefreshSelectedDataSourceFilesAsync()
+        => await LoadSelectedDataSourceFilesAsync(reset: true);
+
+    public async Task LoadMoreSelectedDataSourceFilesAsync()
+    {
+        if (!HasMoreDataSourceFiles || IsLoadingDataSourceFiles || SelectedDataSource == null)
+            return;
+
+        await LoadSelectedDataSourceFilesAsync(reset: false);
+    }
+
+    private async Task LoadSelectedDataSourceFilesAsync(bool reset)
+    {
+        if (SelectedDataSource == null)
+            return;
+
+        if (IsLoadingDataSourceFiles)
+            return;
+
+        IsLoadingDataSourceFiles = true;
         try
         {
-            var results = await _indexingService.SearchAsync(new SearchQuery { MaxResults = 100 });
-            IndexedFiles.Clear();
+            if (reset)
+            {
+                _dataSourceFilesOffset = 0;
+                _useProviderFallbackForDataSourceFiles = false;
+                _providerFallbackValue = null;
+                _useUnfilteredFallbackForDataSourceFiles = false;
+                SelectedDataSourceIndexedItemCount = 0;
+                SelectedDataSourceIndexedFiles.Clear();
+            }
+
+            var pageSize = reset ? InitialDataSourceFilePageSize : DataSourceFilePageSize;
+
+            var results = await _indexingService.SearchAsync(new SearchQuery
+            {
+                DataSourceId = SelectedDataSource.Id,
+                MaxResults = pageSize,
+                Offset = _dataSourceFilesOffset
+            });
+
+            if (reset && results.Count == 0)
+            {
+                var fallbackProviders = new[]
+                {
+                    SelectedDataSource.PluginName,
+                    SelectedDataSource.Model.PluginType,
+                    SelectedDataSource.Model.PluginAssembly
+                }.Where(v => !string.IsNullOrWhiteSpace(v)).Distinct();
+
+                foreach (var provider in fallbackProviders)
+                {
+                    results = await _indexingService.SearchAsync(new SearchQuery
+                    {
+                        Provider = provider,
+                        MaxResults = pageSize,
+                        Offset = 0
+                    });
+
+                    if (results.Count > 0)
+                    {
+                        _useProviderFallbackForDataSourceFiles = true;
+                        _providerFallbackValue = provider;
+                        break;
+                    }
+                }
+
+                if (results.Count == 0)
+                {
+                    results = await _indexingService.SearchAsync(new SearchQuery
+                    {
+                        MaxResults = pageSize,
+                        Offset = 0
+                    });
+                    _useUnfilteredFallbackForDataSourceFiles = results.Count > 0;
+                }
+            }
+            else if (_useProviderFallbackForDataSourceFiles && !string.IsNullOrWhiteSpace(_providerFallbackValue))
+            {
+                results = await _indexingService.SearchAsync(new SearchQuery
+                {
+                    Provider = _providerFallbackValue,
+                    MaxResults = pageSize,
+                    Offset = _dataSourceFilesOffset
+                });
+            }
+            else if (_useUnfilteredFallbackForDataSourceFiles)
+            {
+                results = await _indexingService.SearchAsync(new SearchQuery
+                {
+                    MaxResults = pageSize,
+                    Offset = _dataSourceFilesOffset
+                });
+            }
+
+            var countQuery = new SearchQuery
+            {
+                DataSourceId = SelectedDataSource.Id
+            };
+
+            if (_useProviderFallbackForDataSourceFiles && !string.IsNullOrWhiteSpace(_providerFallbackValue))
+            {
+                countQuery = new SearchQuery
+                {
+                    Provider = _providerFallbackValue
+                };
+            }
+            else if (_useUnfilteredFallbackForDataSourceFiles)
+            {
+                countQuery = new SearchQuery();
+            }
+
+            SelectedDataSourceIndexedItemCount = await _store.GetDocumentCountAsync(countQuery);
+
             foreach (var result in results)
-                IndexedFiles.Add(result);
+                SelectedDataSourceIndexedFiles.Add(result);
+
+            _dataSourceFilesOffset += results.Count;
+            HasMoreDataSourceFiles = results.Count == pageSize;
+            StatusText = $"Loaded {SelectedDataSourceIndexedFiles.Count} file(s) for {SelectedDataSource.Name}.";
         }
         catch (Exception ex)
         {
-            StatusText = $"Unable to load indexed files: {ex.Message}";
+            StatusText = $"Unable to load files for {SelectedDataSource.Name}: {ex.Message}";
+        }
+        finally
+        {
+            IsLoadingDataSourceFiles = false;
         }
     }
 

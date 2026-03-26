@@ -16,6 +16,37 @@
             <Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI, Arial" />
             <Setter Property="Background" Value="#F2F6FC" />
         </Style>
+        <Style Selector="Button">
+            <Setter Property="Background" Value="#2961BD" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="BorderBrush" Value="#25578F" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="12,8" />
+        </Style>
+        <Style Selector="Button:pointerover">
+            <Setter Property="Background" Value="#3A74B4" />
+            <Setter Property="BorderBrush" Value="#2C629C" />
+        </Style>
+        <Style Selector="Button:pressed">
+            <Setter Property="Background" Value="#26578E" />
+            <Setter Property="BorderBrush" Value="#1F4976" />
+        </Style>
+        <Style Selector="Button:disabled">
+            <Setter Property="Background" Value="#BDD0E8" />
+            <Setter Property="Foreground" Value="#6C8099" />
+            <Setter Property="BorderBrush" Value="#AFC5E1" />
+        </Style>
+        <Style Selector="Border.leftPanelShell">
+            <Setter Property="Background" Value="#292F38" />
+
+            <Setter Property="Padding" Value="14" />
+        </Style>
+		<Style Selector="Border.rightPanelShell">
+			<Setter Property="Margin" Value="14,0,0,0"/>
+            <Setter Property="Padding" Value="12"/>
+			<Setter Property="TextElement.Foreground" Value="#23384F"/>
+		</Style>
         <Style Selector="Border.card">
             <Setter Property="Background" Value="#FAFCFF" />
             <Setter Property="BorderBrush" Value="#D7E2F2" />
@@ -25,13 +56,10 @@
     </Window.Styles>
 
     <DockPanel>
-        <Border DockPanel.Dock="Bottom" Margin="14,0,14,14" Padding="12,8"
-                Background="#E8EFFA" BorderBrush="#D3DFF0" BorderThickness="1" CornerRadius="8">
-            <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="#3E5675" />
-        </Border>
 
-        <Grid Margin="14,14,14,10" ColumnDefinitions="25*,75*">
-            <Border Grid.Column="0" Background="#1F3453" BorderBrush="#2A476E" BorderThickness="1" CornerRadius="14" Padding="14">
+
+        <Grid ColumnDefinitions="25*,75*">
+            <Border Grid.Column="0" Classes="leftPanelShell">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
                         <TextBlock Text="Quaero" Foreground="#EFF4FD" FontSize="26" FontWeight="SemiBold" />
@@ -45,100 +73,61 @@
                     </StackPanel>
 
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <StackPanel Spacing="14">
-                            <StackPanel>
-                                <TextBlock Text="DATA SOURCES" Foreground="#BFD0EA" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,6" />
-                                <Button Content="+ Add Data Source" Click="OnAddDataSourceClicked" Margin="0,0,0,6" />
-                                <ListBox x:Name="DataSourcesList"
-                                         ItemsSource="{Binding DataSourcesVM.DataSources}"
-                                         SelectionChanged="OnDataSourcesSelectionChanged"
-                                         Background="#00000000"
-                                         BorderThickness="0">
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <StackPanel Margin="8,6">
-                                                <TextBlock Text="{Binding Name}" Foreground="#EFF4FD" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                                <TextBlock Text="{Binding PluginName}" Foreground="#C6D9F5" FontSize="11" TextTrimming="CharacterEllipsis" />
-                                            </StackPanel>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
-                            </StackPanel>
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="DATA SOURCES" Foreground="#BFD0EA" FontWeight="SemiBold" FontSize="12" />
+                            <Button Content="+ Add Data Source" Click="OnAddDataSourceClicked" />
+                            <ListBox x:Name="DataSourcesList"
+                                     ItemsSource="{Binding DataSourcesVM.DataSources}"
+                                     SelectionChanged="OnDataSourcesSelectionChanged"
+                                     Background="#00000000"
+                                     BorderThickness="0">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Margin="8,6">
+                                            <TextBlock Text="{Binding Name}" Foreground="#EFF4FD" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding PluginName}" Foreground="#C6D9F5" FontSize="11" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
 
-                            <StackPanel>
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <TextBlock Grid.Column="0" Text="INDEXED FILES" Foreground="#BFD0EA" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,6" />
-                                    <Button Grid.Column="1" Content="Refresh" Click="OnRefreshIndexedFilesClicked" Padding="10,4" />
-                                </Grid>
-                                <ListBox x:Name="IndexedFilesList"
-                                         ItemsSource="{Binding IndexedFiles}"
-                                         SelectionChanged="OnIndexedFilesSelectionChanged"
-                                         Background="#00000000"
-                                         BorderThickness="0">
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <StackPanel Margin="8,6">
-                                                <TextBlock Text="{Binding Document.Title}" Foreground="#EFF4FD" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                                <TextBlock Foreground="#C6D9F5" FontSize="11">
-                                                    <Run Text="{Binding Document.Provider}" />
-                                                    <Run Text=" · " />
-                                                    <Run Text="{Binding Document.Type}" />
-                                                </TextBlock>
-                                            </StackPanel>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
-                            </StackPanel>
+                            <TextBlock Text="SEARCH HISTORY" Foreground="#BFD0EA" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
+                            <ListBox x:Name="SearchHistoryList"
+                                     ItemsSource="{Binding SearchHistory}"
+                                     SelectionChanged="OnSearchHistorySelectionChanged"
+                                     Background="#00000000"
+                                     BorderThickness="0">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Margin="8,6" Spacing="2">
+                                            <TextBlock Text="{Binding Query}" Foreground="#EFF4FD" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding ResultLabel}" Foreground="#C6D9F5" FontSize="11" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
 
-                            <StackPanel>
-                                <TextBlock Text="SEARCH HISTORY" Foreground="#BFD0EA" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,6" />
-                                <ListBox x:Name="SearchHistoryList"
-                                         ItemsSource="{Binding SearchHistory}"
-                                         SelectionChanged="OnSearchHistorySelectionChanged"
-                                         Background="#00000000"
-                                         BorderThickness="0">
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <StackPanel Margin="8,6">
-                                                <TextBlock Text="{Binding Query}" Foreground="#EFF4FD" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                                <TextBlock FontSize="11" Foreground="#C6D9F5">
-                                                    <Run Text="{Binding ResultLabel}" />
-                                                    <Run Text=" · " />
-                                                    <Run Text="{Binding RanAt, StringFormat='{}{0:g}'}" />
-                                                </TextBlock>
-                                            </StackPanel>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
-                            </StackPanel>
-
-                            <StackPanel>
-                                <TextBlock Text="CHAT HISTORY" Foreground="#BFD0EA" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,6" />
-                                <ListBox x:Name="ChatHistoryList"
-                                         ItemsSource="{Binding ChatHistory}"
-                                         SelectionChanged="OnChatHistorySelectionChanged"
-                                         Background="#00000000"
-                                         BorderThickness="0">
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <StackPanel Margin="8,6">
-                                                <TextBlock Text="{Binding Prompt}" Foreground="#EFF4FD" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                                <TextBlock FontSize="11" Foreground="#C6D9F5">
-                                                    <Run Text="{Binding ResultLabel}" />
-                                                    <Run Text=" · " />
-                                                    <Run Text="{Binding RanAt, StringFormat='{}{0:g}'}" />
-                                                </TextBlock>
-                                            </StackPanel>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
-                            </StackPanel>
+                            <TextBlock Text="CHAT HISTORY" Foreground="#BFD0EA" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
+                            <ListBox x:Name="ChatHistoryList"
+                                     ItemsSource="{Binding ChatHistory}"
+                                     SelectionChanged="OnChatHistorySelectionChanged"
+                                     Background="#00000000"
+                                     BorderThickness="0">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Margin="8,6" Spacing="2">
+                                            <TextBlock Text="{Binding Prompt}" Foreground="#EFF4FD" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding ResultLabel}" Foreground="#C6D9F5" FontSize="11" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
                         </StackPanel>
                     </ScrollViewer>
                 </DockPanel>
             </Border>
 
-            <Border Grid.Column="1" Classes="card" Margin="14,0,0,0" Padding="18" TextElement.Foreground="#23384F">
+            <Border Classes="rightPanelShell" Grid.Column="1">
                 <Grid>
                     <!-- Workspace Pane -->
                     <ScrollViewer x:Name="WorkspacePane" IsVisible="True">
@@ -267,8 +256,8 @@
                     </ScrollViewer>
 
                     <!-- Data Source Pane -->
-                    <ScrollViewer x:Name="DataSourcePane" IsVisible="False">
-                        <StackPanel Spacing="10">
+                    <Grid x:Name="DataSourcePane" IsVisible="False" RowDefinitions="Auto,*">
+                        <StackPanel Grid.Row="0" Spacing="10">
                             <TextBlock Text="{Binding SelectedDataSource.Name}" FontSize="28" FontWeight="SemiBold" />
                             <TextBlock FontSize="13" Foreground="#526782">
                                 <Run Text="{Binding SelectedDataSource.PluginName}" />
@@ -276,23 +265,26 @@
                                 <Run Text="{Binding SelectedDataSource.StatusText}" />
                             </TextBlock>
 
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Content="Edit" Click="OnEditDataSourceClicked" />
+                                <Button Content="Remove" Click="OnRemoveDataSourceClicked" />
+                                <Button Content="Enable / Disable" Click="OnToggleDataSourceClicked" />
+                                <Button Content="Run This Source" Click="OnRunSelectedClicked" />
+                                <Button Content="Refresh Files" Click="OnRefreshDataSourceFilesClicked" />
+                            </StackPanel>
+
                             <Border Background="#EEF4FC" CornerRadius="10" Padding="12">
-                                <Grid ColumnDefinitions="160,*" RowDefinitions="Auto,Auto,Auto">
+                                <Grid ColumnDefinitions="160,*" RowDefinitions="Auto,Auto,Auto,Auto">
                                     <TextBlock Grid.Row="0" Grid.Column="0" Text="Schedule" FontWeight="SemiBold" />
                                     <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SelectedDataSource.CronSchedule}" />
                                     <TextBlock Grid.Row="1" Grid.Column="0" Text="Enabled" FontWeight="SemiBold" Margin="0,8,0,0" />
                                     <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SelectedDataSource.EnabledText}" Margin="0,8,0,0" />
                                     <TextBlock Grid.Row="2" Grid.Column="0" Text="Data Source ID" FontWeight="SemiBold" Margin="0,8,0,0" />
                                     <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SelectedDataSource.Id}" Margin="0,8,0,0" />
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Indexed Items" FontWeight="SemiBold" Margin="0,8,0,0" />
+                                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SelectedDataSourceIndexedItemCountText}" Margin="0,8,0,0" />
                                 </Grid>
                             </Border>
-
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <Button Content="Edit" Click="OnEditDataSourceClicked" />
-                                <Button Content="Remove" Click="OnRemoveDataSourceClicked" />
-                                <Button Content="Enable / Disable" Click="OnToggleDataSourceClicked" />
-                                <Button Content="Run This Source" Click="OnRunSelectedClicked" />
-                            </StackPanel>
 
                             <Border Background="#F4F8FE" BorderBrush="#D7E2F2" BorderThickness="1" CornerRadius="10" Padding="12">
                                 <StackPanel Spacing="8">
@@ -310,11 +302,46 @@
                                 </StackPanel>
                             </Border>
                         </StackPanel>
-                    </ScrollViewer>
+
+                        <Border Grid.Row="1" Background="#F4F8FE" BorderBrush="#D7E2F2" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,12,0,0">
+                            <Grid RowDefinitions="Auto,*,Auto">
+                                <TextBlock Grid.Row="0" Text="Indexed Files" FontSize="16" FontWeight="SemiBold" />
+                                <ScrollViewer x:Name="DataSourceFilesScrollViewer" Grid.Row="1" VerticalScrollBarVisibility="Auto" ScrollChanged="OnDataSourceFilesScrollChanged">
+                                    <ListBox x:Name="DataSourceIndexedFilesList" ItemsSource="{Binding SelectedDataSourceIndexedFiles}" SelectionChanged="OnDataSourceIndexedFilesSelectionChanged" BorderThickness="0" Background="#00000000">
+                                        <ListBox.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <UniformGrid Columns="3" />
+                                            </ItemsPanelTemplate>
+                                        </ListBox.ItemsPanel>
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="#EEF4FC" CornerRadius="8" Padding="8" Margin="0,0,10,10" MinWidth="200">
+                                                    <StackPanel Spacing="3">
+                                                        <TextBlock Text="{Binding Document.Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{Binding Document.Location}" FontSize="11" Foreground="#436489" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock FontSize="11" Foreground="#4F6A87">
+                                                            <Run Text="{Binding Document.Provider}" />
+                                                            <Run Text=" · " />
+                                                            <Run Text="{Binding Document.Type}" />
+                                                        </TextBlock>
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </ScrollViewer>
+                                <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="10">
+                                    <TextBlock Text="Loading more..." IsVisible="{Binding IsLoadingDataSourceFiles}" Foreground="#526782" />
+                                    <Button Content="Load More" Click="OnLoadMoreDataSourceFilesClicked" IsVisible="{Binding HasMoreDataSourceFiles}" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </Grid>
 
                     <!-- Indexed File Pane -->
                     <ScrollViewer x:Name="IndexedFilePane" IsVisible="False">
                         <StackPanel Spacing="10">
+                            <Button Content="← Back" HorizontalAlignment="Left" Click="OnBackToPreviousPaneClicked" IsVisible="{Binding CanGoBack}" />
                             <TextBlock Text="{Binding SelectedIndexedFile.Document.Title}" FontSize="28" FontWeight="SemiBold" />
                             <TextBlock Text="{Binding SelectedIndexedFile.Document.Location}" FontSize="13" Foreground="#1F64A8" />
 
