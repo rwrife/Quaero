@@ -18,7 +18,10 @@ public class PluginLoader
 
     public PluginLoader(string pluginsDirectory, ILogger<PluginLoader> logger)
     {
-        _pluginsDirectory = pluginsDirectory;
+        // Resolve relative paths against the app base directory
+        _pluginsDirectory = Path.IsPathRooted(pluginsDirectory)
+            ? pluginsDirectory
+            : Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, pluginsDirectory));
         _logger = logger;
 
         if (!Directory.Exists(_pluginsDirectory))

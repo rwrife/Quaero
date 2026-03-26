@@ -11,9 +11,16 @@ public class IndexConfiguration
 
     public bool EncryptionEnabled { get; set; } = false;
     public string? EncryptionKey { get; set; }
-    public string PluginsDirectory { get; set; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "Quaero", "plugins");
+
+    /// <summary>
+    /// Directory where plugin assemblies are loaded from.
+    /// Override with QUAERO_PLUGINS_DIR environment variable for debugging.
+    /// </summary>
+    public string PluginsDirectory { get; set; } =
+        Environment.GetEnvironmentVariable("QUAERO_PLUGINS_DIR")
+        ?? Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Quaero", "plugins");
 
     public int IndexIntervalMinutes { get; set; } = 30;
 }

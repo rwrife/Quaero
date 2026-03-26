@@ -12,6 +12,18 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
   </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <PluginsOutputDir>$(MSBuildThisFileDirectory)..\..\artifacts\plugins\</PluginsOutputDir>
+  </PropertyGroup>
+  <Target Name="CopyToPluginsFolder" AfterTargets="Build" Condition="'$(Configuration)' == 'Debug'">
+    <MakeDir Directories="$(PluginsOutputDir)" />
+    <ItemGroup>
+      <PluginFiles Include="$(OutputPath)**\*.*" Exclude="$(OutputPath)**\Quaero.Plugins.Abstractions.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(PluginFiles)" DestinationFolder="$(PluginsOutputDir)" SkipUnchangedFiles="true" />
+  </Target>
 
 </Project>
