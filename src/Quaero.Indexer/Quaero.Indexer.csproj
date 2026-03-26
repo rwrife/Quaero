@@ -1,12 +1,31 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
     <ProjectReference Include="..\Quaero.Core\Quaero.Core.csproj" />
     <ProjectReference Include="..\Quaero.Plugins.Abstractions\Quaero.Plugins.Abstractions.csproj" />
   </ItemGroup>
 
+  <!-- Build plugin projects as dependencies (don't reference their assemblies directly) -->
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.3" />
+    <ProjectReference Include="..\Quaero.Plugins.Markdown\Quaero.Plugins.Markdown.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <Private>false</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Quaero.Plugins.Text\Quaero.Plugins.Text.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <Private>false</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Quaero.Plugins.Json\Quaero.Plugins.Json.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <Private>false</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Quaero.Plugins.Imap\Quaero.Plugins.Imap.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <Private>false</Private>
+    </ProjectReference>
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="MimeKit" Version="4.15.1" />
   </ItemGroup>
 
@@ -16,5 +35,35 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+
+  <!--
+    After building, copy all plugin outputs into a plugins/ subfolder next to the Indexer exe.
+    This ensures the PluginLoader can discover them at runtime.
+    Layout:
+      bin/Debug/net10.0/
+        Quaero.Indexer.exe
+        plugins/          ← Plugin DLLs + deps
+  -->
+  <Target Name="BundlePlugins" AfterTargets="Build">
+    <PropertyGroup>
+      <BundledPluginsDir>$(OutputPath)plugins\</BundledPluginsDir>
+    </PropertyGroup>
+    <MakeDir Directories="$(BundledPluginsDir)" />
+
+    <ItemGroup>
+      <PluginProjectDirs Include=
+        "..\Quaero.Plugins.Markdown\bin\$(Configuration)\$(TargetFramework)\;
+         ..\Quaero.Plugins.Text\bin\$(Configuration)\$(TargetFramework)\;
+         ..\Quaero.Plugins.Json\bin\$(Configuration)\$(TargetFramework)\;
+         ..\Quaero.Plugins.Imap\bin\$(Configuration)\$(TargetFramework)\" />
+    </ItemGroup>
+    <ItemGroup>
+      <AllPluginFiles Include="%(PluginProjectDirs.Identity)**\*.*"
+                      Exclude="%(PluginProjectDirs.Identity)**\Quaero.Plugins.Abstractions.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(AllPluginFiles)"
+          DestinationFolder="$(BundledPluginsDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
 
 </Project>

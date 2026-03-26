@@ -96,16 +96,30 @@ public class PluginLoader
     {
         var results = new List<(string, string, ISearchPlugin)>();
 
-        if (!Directory.Exists(_pluginsDirectory))
-            return results;
+        _logger.LogInformation("Scanning plugins directory: {Dir}", _pluginsDirectory);
 
-        foreach (var dllPath in Directory.EnumerateFiles(_pluginsDirectory, "*.dll"))
+        if (!Directory.Exists(_pluginsDirectory))
+        {
+            _logger.LogWarning("Plugins directory does not exist: {Dir}", _pluginsDirectory);
+            return results;
+        }
+
+        var pluginDlls = Directory.EnumerateFiles(_pluginsDirectory, "Quaero.Plugins.*.dll").ToList();
+        _logger.LogInformation("Found {Count} candidate plugin DLL(s): {Files}",
+            pluginDlls.Count,
+            string.Join(", ", pluginDlls.Select(Path.GetFileName)));
+
+        foreach (var dllPath in pluginDlls)
         {
             try
             {
                 var assemblyName = Path.GetFileNameWithoutExtension(dllPath);
                 var assembly = LoadAssembly(assemblyName);
-                if (assembly == null) continue;
+                if (assembly == null)
+                {
+                    _logger.LogWarning("Failed to load assembly for plugin candidate: {File}", Path.GetFileName(dllPath));
+                    continue;
+                }
 
                 foreach (var type in assembly.GetExportedTypes())
                 {
