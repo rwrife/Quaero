@@ -145,7 +145,21 @@ public class MainWindowViewModel : INotifyPropertyChanged
     public SearchResult? SelectedIndexedFile
     {
         get => _selectedIndexedFile;
-        private set => SetField(ref _selectedIndexedFile, value);
+        private set
+        {
+            if (SetField(ref _selectedIndexedFile, value))
+                OnPropertyChanged(nameof(ShowIndexedFileSummary));
+        }
+    }
+
+    public bool ShowIndexedFileSummary
+    {
+        get
+        {
+            var summary = SelectedIndexedFile?.Document.Summary ?? string.Empty;
+            var content = SelectedIndexedFile?.Document.Content ?? string.Empty;
+            return !string.Equals(summary, content, StringComparison.Ordinal);
+        }
     }
 
     public SearchHistoryEntry? SelectedSearchHistory

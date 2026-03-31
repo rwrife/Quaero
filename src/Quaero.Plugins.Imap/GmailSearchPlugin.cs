@@ -45,87 +45,52 @@ public class GmailSearchPlugin : ISearchPlugin
     public async IAsyncEnumerable<DiscoveredDocument> DiscoverDocumentsAsync(
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        LogDebug("Starting Gmail discovery.");
         var oauth = await TryGetGoogleAccessTokenAsync(cancellationToken);
         if (oauth == null)
             throw new InvalidOperationException("Google OAuth token unavailable. Sign in to Gmail in Settings and try again.");
+        LogDebug($"OAuth token acquired. Email='{oauth.Email}'.");
 
         using var http = new HttpClient();
         http.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", oauth.AccessToken);
 
-        var query = BuildGmailQuery(_lastSuccessfulRun);
-        var retriedWithoutQuery = false;
-        var retainedIds = new Queue<string>();
-        string? pageToken = null;
-
-        while (true)
+        var sourceKey = string.IsNullOrWhiteSpace(_username)
+            ? "gmail"
+            : $"gmail:{_username.Trim().ToLowerInvariant()}";
+        var cursor = await LoadCursorAsync(sourceKey, cancellationToken);
+        Queue<string> retainedIds;
+        if (cursor?.LastInternalDateMs is long newestIndexedMs)
         {
-            if (cancellationToken.IsCancellationRequested)
-                yield break;
+            var newestQuery = BuildQueryAfterNewestIndexedDate(newestIndexedMs);
+            LogDebug($"Cursor found. Looking for emails newer than newest indexed date with query '{newestQuery}'.");
+            retainedIds = await CollectRetainedMessageIdsAsync(http, newestQuery, cancellationToken);
 
-            var listUrl = $"{GmailApiBaseUrl}/messages?maxResults=500";
-            if (!string.IsNullOrWhiteSpace(query))
-                listUrl += $"&q={Uri.EscapeDataString(query)}";
-            if (!string.IsNullOrWhiteSpace(pageToken))
-                listUrl += $"&pageToken={Uri.EscapeDataString(pageToken)}";
-
-            using var listResponse = await http.GetAsync(listUrl, cancellationToken);
-            if (!listResponse.IsSuccessStatusCode)
+            if (retainedIds.Count == 0 && !string.IsNullOrWhiteSpace(cursor.LastMessageId))
             {
-                var errorBody = await listResponse.Content.ReadAsStringAsync(cancellationToken);
-                throw new InvalidOperationException($"Gmail list request failed ({(int)listResponse.StatusCode}): {errorBody}");
+                LogDebug($"No results from date query. Falling back to cursor walk from message id '{cursor.LastMessageId}'.");
+                retainedIds = await CollectRetainedMessageIdsByWalkingFromCursorAsync(http, cursor.LastMessageId, cancellationToken);
             }
-
-            var listJson = await listResponse.Content.ReadAsStringAsync(cancellationToken);
-            GmailListMessagesResponse? list;
-            try
-            {
-                list = JsonSerializer.Deserialize<GmailListMessagesResponse>(listJson);
-            }
-            catch
-            {
-                throw new InvalidOperationException("Failed to parse Gmail list response.");
-            }
-
-            var messages = list?.Messages ?? [];
-            if (messages.Count == 0)
-            {
-                if (!retriedWithoutQuery && !string.IsNullOrWhiteSpace(query))
-                {
-                    query = string.Empty;
-                    pageToken = null;
-                    retainedIds.Clear();
-                    retriedWithoutQuery = true;
-                    continue;
-                }
-
-                break;
-            }
-
-            foreach (var item in messages)
-            {
-                if (string.IsNullOrWhiteSpace(item.Id))
-                    continue;
-
-                retainedIds.Enqueue(item.Id);
-                while (retainedIds.Count > _maxMessages)
-                    retainedIds.Dequeue();
-            }
-
-            pageToken = list?.NextPageToken;
-            if (string.IsNullOrWhiteSpace(pageToken))
-                break;
+        }
+        else if (!string.IsNullOrWhiteSpace(cursor?.LastMessageId))
+        {
+            LogDebug($"Cursor found. Walking mailbox from last message id '{cursor.LastMessageId}' for next block.");
+            retainedIds = await CollectRetainedMessageIdsByWalkingFromCursorAsync(http, cursor.LastMessageId, cancellationToken);
+        }
+        else
+        {
+            LogDebug("No cursor found. Building first block from oldest emails.");
+            retainedIds = await CollectRetainedMessageIdsAsync(http, null, cancellationToken);
         }
 
         if (retainedIds.Count == 0)
         {
-            var probeMessageId = await TryGetInboxProbeMessageIdAsync(http, cancellationToken);
-            if (!string.IsNullOrWhiteSpace(probeMessageId))
-                retainedIds.Enqueue(probeMessageId);
+            LogDebug("No messages found for this run.");
+            yield break;
         }
 
-        if (retainedIds.Count == 0)
-            throw new InvalidOperationException("Gmail API returned no messages. Verify Gmail API is enabled and OAuth scope includes mail read access.");
+        long? lastProcessedInternalDateMs = cursor?.LastInternalDateMs;
+        string? lastProcessedMessageId = cursor?.LastMessageId;
 
         foreach (var messageId in retainedIds.Reverse())
         {
@@ -135,14 +100,14 @@ public class GmailSearchPlugin : ISearchPlugin
             using var messageResponse = await http.GetAsync(
                 $"{GmailApiBaseUrl}/messages/{Uri.EscapeDataString(messageId)}?format=full",
                 cancellationToken);
+            var messageJson = await messageResponse.Content.ReadAsStringAsync(cancellationToken);
             if (!messageResponse.IsSuccessStatusCode)
                 continue;
 
-            var messageJson = await messageResponse.Content.ReadAsStringAsync(cancellationToken);
             GmailMessageResponse? message;
             try
             {
-                message = JsonSerializer.Deserialize<GmailMessageResponse>(messageJson);
+                message = JsonSerializer.Deserialize<GmailMessageResponse>(messageJson, JsonOptions);
             }
             catch
             {
@@ -167,6 +132,11 @@ public class GmailSearchPlugin : ISearchPlugin
             if (string.IsNullOrWhiteSpace(provider))
                 provider = "gmail";
 
+            var indexedDateMs = ParseIndexedDateMilliseconds(dateHeader, message.InternalDate);
+            if (indexedDateMs.HasValue && (!lastProcessedInternalDateMs.HasValue || indexedDateMs.Value > lastProcessedInternalDateMs.Value))
+                lastProcessedInternalDateMs = indexedDateMs.Value;
+            lastProcessedMessageId = message.Id;
+
             yield return new DiscoveredDocument
             {
                 Type = "email",
@@ -186,6 +156,19 @@ public class GmailSearchPlugin : ISearchPlugin
                 }
             };
         }
+
+        if (!string.IsNullOrWhiteSpace(lastProcessedMessageId))
+        {
+            await SaveCursorAsync(
+                sourceKey,
+                new GmailCursor
+                {
+                    LastMessageId = lastProcessedMessageId,
+                    LastInternalDateMs = lastProcessedInternalDateMs
+                },
+                cancellationToken);
+            LogDebug($"Updated cursor for '{sourceKey}' to message '{lastProcessedMessageId}' (ms={lastProcessedInternalDateMs}).");
+        }
     }
 
     private async Task<GoogleOAuthAccessToken?> TryGetGoogleAccessTokenAsync(CancellationToken cancellationToken)
@@ -195,7 +178,10 @@ public class GmailSearchPlugin : ISearchPlugin
             "Quaero",
             "google-oauth.json");
         if (!File.Exists(settingsPath))
+        {
+            LogDebug($"OAuth settings file not found at '{settingsPath}'.");
             return null;
+        }
 
         GoogleOAuthSettingsDocument? settings;
         try
@@ -205,6 +191,7 @@ public class GmailSearchPlugin : ISearchPlugin
         }
         catch
         {
+            LogDebug("Failed to read/parse OAuth settings file.");
             return null;
         }
 
@@ -212,6 +199,7 @@ public class GmailSearchPlugin : ISearchPlugin
             || string.IsNullOrWhiteSpace(settings.ClientId)
             || string.IsNullOrWhiteSpace(settings.RefreshToken))
         {
+            LogDebug("OAuth settings are missing required client_id or refresh_token.");
             return null;
         }
 
@@ -230,6 +218,7 @@ public class GmailSearchPlugin : ISearchPlugin
             "https://oauth2.googleapis.com/token",
             new FormUrlEncodedContent(payload),
             cancellationToken);
+        LogDebug($"Token refresh response status: {(int)response.StatusCode}");
         if (!response.IsSuccessStatusCode)
         {
             var tokenError = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -258,31 +247,208 @@ public class GmailSearchPlugin : ISearchPlugin
         return result.Trim();
     }
 
-    private static string BuildGmailQuery(DateTime? lastSuccessfulRun)
+    private static void LogDebug(string message)
+        => Console.WriteLine($"[GmailSearchPlugin] {message}");
+
+    private static string BuildQueryAfterNewestIndexedDate(long newestIndexedDateMs)
     {
-        return "after:2001/01/01";
+        var seconds = Math.Max(0, newestIndexedDateMs / 1000);
+        return $"after:{seconds}";
     }
 
-    private static async Task<string?> TryGetInboxProbeMessageIdAsync(HttpClient http, CancellationToken cancellationToken)
+    private async Task<Queue<string>> CollectRetainedMessageIdsAsync(HttpClient http, string? query, CancellationToken cancellationToken)
     {
-        using var probeResponse = await http.GetAsync(
-            $"{GmailApiBaseUrl}/messages?labelIds=INBOX&maxResults=1",
-            cancellationToken);
-        if (!probeResponse.IsSuccessStatusCode)
+        var retainedIds = new Queue<string>();
+        string? pageToken = null;
+
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var listUrl = $"{GmailApiBaseUrl}/messages?maxResults=500";
+            if (!string.IsNullOrWhiteSpace(query))
+                listUrl += $"&q={Uri.EscapeDataString(query)}";
+            if (!string.IsNullOrWhiteSpace(pageToken))
+                listUrl += $"&pageToken={Uri.EscapeDataString(pageToken)}";
+
+            using var listResponse = await http.GetAsync(listUrl, cancellationToken);
+            var listJson = await listResponse.Content.ReadAsStringAsync(cancellationToken);
+            LogDebug($"List response status: {(int)listResponse.StatusCode} (query='{query ?? "<none>"}', pageToken='{pageToken ?? "<none>"}')");
+            if (!listResponse.IsSuccessStatusCode)
+                throw new InvalidOperationException($"Gmail list request failed ({(int)listResponse.StatusCode}): {listJson}");
+
+            GmailListMessagesResponse? list;
+            try
+            {
+                list = JsonSerializer.Deserialize<GmailListMessagesResponse>(listJson, JsonOptions);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to parse Gmail list response: {ex.Message}");
+            }
+
+            var messages = list?.Messages ?? [];
+            if (messages.Count == 0)
+                break;
+
+            foreach (var item in messages)
+            {
+                if (string.IsNullOrWhiteSpace(item.Id))
+                    continue;
+
+                retainedIds.Enqueue(item.Id);
+                while (retainedIds.Count > _maxMessages)
+                    retainedIds.Dequeue();
+            }
+
+            pageToken = list?.NextPageToken;
+            if (string.IsNullOrWhiteSpace(pageToken))
+                break;
+        }
+
+        LogDebug($"Retained {retainedIds.Count} message id(s) for processing.");
+        return retainedIds;
+    }
+
+    private async Task<Queue<string>> CollectRetainedMessageIdsByWalkingFromCursorAsync(HttpClient http, string lastMessageId, CancellationToken cancellationToken)
+    {
+        var retainedIds = new Queue<string>();
+        string? pageToken = null;
+        var foundCursor = false;
+
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var listUrl = $"{GmailApiBaseUrl}/messages?maxResults=500";
+            if (!string.IsNullOrWhiteSpace(pageToken))
+                listUrl += $"&pageToken={Uri.EscapeDataString(pageToken)}";
+
+            using var listResponse = await http.GetAsync(listUrl, cancellationToken);
+            var listJson = await listResponse.Content.ReadAsStringAsync(cancellationToken);
+            if (!listResponse.IsSuccessStatusCode)
+                throw new InvalidOperationException($"Gmail list request failed ({(int)listResponse.StatusCode}): {listJson}");
+
+            GmailListMessagesResponse? list;
+            try
+            {
+                list = JsonSerializer.Deserialize<GmailListMessagesResponse>(listJson, JsonOptions);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to parse Gmail list response: {ex.Message}");
+            }
+
+            var messages = list?.Messages ?? [];
+            if (messages.Count == 0)
+                break;
+
+            foreach (var item in messages)
+            {
+                if (string.IsNullOrWhiteSpace(item.Id))
+                    continue;
+
+                if (string.Equals(item.Id, lastMessageId, StringComparison.Ordinal))
+                {
+                    foundCursor = true;
+                    break;
+                }
+
+                retainedIds.Enqueue(item.Id);
+                while (retainedIds.Count > _maxMessages)
+                    retainedIds.Dequeue();
+            }
+
+            if (foundCursor)
+                break;
+
+            pageToken = list?.NextPageToken;
+            if (string.IsNullOrWhiteSpace(pageToken))
+                break;
+        }
+
+        LogDebug(foundCursor
+            ? $"Cursor walk found cursor and retained {retainedIds.Count} candidate id(s)."
+            : "Cursor walk did not find the stored cursor message id.");
+        return foundCursor ? retainedIds : new Queue<string>();
+    }
+
+    private static long? ParseInternalDateMilliseconds(string? internalDate)
+    {
+        if (!long.TryParse(internalDate, out var ms))
             return null;
 
-        var probeJson = await probeResponse.Content.ReadAsStringAsync(cancellationToken);
-        GmailListMessagesResponse? probeList;
+        return ms;
+    }
+
+    private static long? ParseIndexedDateMilliseconds(string? headerDate, string? internalDate)
+    {
+        if (!string.IsNullOrWhiteSpace(headerDate)
+            && DateTimeOffset.TryParse(headerDate, out var parsedHeaderDate))
+        {
+            return parsedHeaderDate.ToUniversalTime().ToUnixTimeMilliseconds();
+        }
+
+        return ParseInternalDateMilliseconds(internalDate);
+    }
+
+    private static string GetCursorPath()
+    {
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Quaero",
+            "gmail-cursors.json");
+    }
+
+    private static async Task<GmailCursor?> LoadCursorAsync(string sourceKey, CancellationToken cancellationToken)
+    {
+        var path = GetCursorPath();
+        if (!File.Exists(path))
+            return null;
+
         try
         {
-            probeList = JsonSerializer.Deserialize<GmailListMessagesResponse>(probeJson);
+            var json = await File.ReadAllTextAsync(path, cancellationToken);
+            var map = JsonSerializer.Deserialize<Dictionary<string, GmailCursor>>(json, JsonOptions);
+            if (map == null)
+                return null;
+
+            return map.TryGetValue(sourceKey, out var cursor) ? cursor : null;
         }
         catch
         {
             return null;
         }
+    }
 
-        return probeList?.Messages?.FirstOrDefault()?.Id;
+    private static async Task SaveCursorAsync(string sourceKey, GmailCursor cursor, CancellationToken cancellationToken)
+    {
+        var path = GetCursorPath();
+        var directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrWhiteSpace(directory))
+            Directory.CreateDirectory(directory);
+
+        Dictionary<string, GmailCursor> map;
+        if (File.Exists(path))
+        {
+            try
+            {
+                var existing = await File.ReadAllTextAsync(path, cancellationToken);
+                map = JsonSerializer.Deserialize<Dictionary<string, GmailCursor>>(existing, JsonOptions) ?? new();
+            }
+            catch
+            {
+                map = new();
+            }
+        }
+        else
+        {
+            map = new();
+        }
+
+        map[sourceKey] = cursor;
+        var json = JsonSerializer.Serialize(map, new JsonSerializerOptions { WriteIndented = true });
+        await File.WriteAllTextAsync(path, json, cancellationToken);
     }
 
     private static Dictionary<string, string> ToHeaderDictionary(List<GmailHeader>? headers)
@@ -432,4 +598,10 @@ internal class GmailHeader
 {
     public string? Name { get; set; }
     public string? Value { get; set; }
+}
+
+internal class GmailCursor
+{
+    public string? LastMessageId { get; set; }
+    public long? LastInternalDateMs { get; set; }
 }

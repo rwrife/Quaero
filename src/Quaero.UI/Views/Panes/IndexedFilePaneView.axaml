@@ -24,10 +24,6 @@
 
             <Border Background="#F4F8FE" BorderBrush="#D7E2F2" BorderThickness="1" CornerRadius="10" Padding="12">
                 <StackPanel Spacing="10">
-                    <TextBlock Text="Summary" FontWeight="SemiBold" FontSize="15" />
-                    <TextBlock Text="{Binding SelectedIndexedFile.Document.Summary}" TextWrapping="Wrap" Foreground="#394F69" />
-                    <Separator />
-                    <TextBlock Text="Content Preview" FontWeight="SemiBold" FontSize="15" />
                     <TextBlock Text="{Binding SelectedIndexedFile.Document.Content}" TextWrapping="Wrap" Foreground="#445B75" MaxLines="24" />
                 </StackPanel>
             </Border>
