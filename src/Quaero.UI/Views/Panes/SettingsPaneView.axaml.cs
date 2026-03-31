@@ -9,6 +9,7 @@ public partial class SettingsPaneView : UserControl
     public event Action? CompactRequested;
     public event Action? IndexAllRequested;
     public event Action? RefreshRequested;
+    public event Func<Task>? GoogleSignInRequested;
 
     public SettingsPaneView()
     {
@@ -26,4 +27,10 @@ public partial class SettingsPaneView : UserControl
 
     private void OnRefreshClicked(object? sender, RoutedEventArgs e)
         => RefreshRequested?.Invoke();
+
+    private async void OnGoogleSignInClicked(object? sender, RoutedEventArgs e)
+    {
+        if (GoogleSignInRequested != null)
+            await GoogleSignInRequested.Invoke();
+    }
 }

@@ -50,6 +50,7 @@ public partial class MainWindow : Window
         SettingsPane.CompactRequested += OnCompactRequested;
         SettingsPane.IndexAllRequested += OnIndexAllRequested;
         SettingsPane.RefreshRequested += OnRefreshRequested;
+        SettingsPane.GoogleSignInRequested += OnGoogleSignInRequested;
     }
 
     private async void OnIndexAllRequested()
@@ -124,8 +125,19 @@ public partial class MainWindow : Window
     {
         var selected = VM.DataSourcesVM.SelectedDataSource;
         if (selected == null) return;
+        VM.AppendDataSourceDebugLog($"Run requested for '{selected.Name}' ({selected.Id}).");
         await VM.DataSourcesVM.RunSingleDataSourceAsync(selected.Id);
+
+        var refreshed = VM.DataSourcesVM.DataSources.FirstOrDefault(ds => ds.Id == selected.Id);
+        if (refreshed?.LatestRun != null)
+        {
+            VM.AppendDataSourceDebugLog(
+                $"Run status: {refreshed.LatestRun.Status}, docs indexed this run: {refreshed.LatestRun.DocumentCount}, error: {refreshed.LatestRun.ErrorMessage ?? "(none)"}.");
+        }
+
+        VM.AppendDataSourceDebugLog($"Run finished for '{selected.Name}'. Refreshing indexed files list.");
         await VM.RefreshSelectedDataSourceFilesAsync();
+        VM.AppendDataSourceDebugLog("Refresh complete.");
     }
 
     private async void OnRefreshRequested()
@@ -136,6 +148,9 @@ public partial class MainWindow : Window
 
     private void OnToggleIndexerRequested()
         => VM.SettingsVM.ToggleIndexer();
+
+    private async Task OnGoogleSignInRequested()
+        => await VM.SettingsVM.SignInWithGoogleAsync();
 
     private async void OnSubmitPrimaryInputRequested()
     {

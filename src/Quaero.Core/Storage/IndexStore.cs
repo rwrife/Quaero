@@ -156,13 +156,18 @@ public class IndexStore : IDisposable
 
         if (query.Provider != null)
         {
-            sql += " AND d.provider = $provider";
+            sql += " AND d.provider = $provider COLLATE NOCASE";
             cmd.Parameters.AddWithValue("$provider", query.Provider);
         }
         if (query.DataSourceId != null)
         {
             sql += " AND json_extract(d.extended_data, '$.DataSourceId') = $dataSourceId";
             cmd.Parameters.AddWithValue("$dataSourceId", query.DataSourceId);
+        }
+        if (query.DataSourceName != null)
+        {
+            sql += " AND json_extract(d.extended_data, '$.DataSourceName') = $dataSourceName";
+            cmd.Parameters.AddWithValue("$dataSourceName", query.DataSourceName);
         }
         if (query.Type != null)
         {
@@ -220,6 +225,27 @@ public class IndexStore : IDisposable
         return result.ToString() != contentHash;
     }
 
+    public async Task EnsureDataSourceMetadataByLocationAsync(
+        string location,
+        string dataSourceId,
+        string dataSourceName,
+        CancellationToken cancellationToken = default)
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = """
+            UPDATE documents
+            SET extended_data = json_set(
+                json_set(COALESCE(extended_data, '{}'), '$.DataSourceId', $dataSourceId),
+                '$.DataSourceName',
+                $dataSourceName)
+            WHERE location = $location;
+            """;
+        cmd.Parameters.AddWithValue("$location", location);
+        cmd.Parameters.AddWithValue("$dataSourceId", dataSourceId);
+        cmd.Parameters.AddWithValue("$dataSourceName", dataSourceName);
+        await cmd.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     public async Task<int> GetDocumentCountAsync(CancellationToken cancellationToken = default)
     {
         using var cmd = _connection.CreateCommand();
@@ -236,13 +262,18 @@ public class IndexStore : IDisposable
 
         if (query.Provider != null)
         {
-            sql += " AND d.provider = $provider";
+            sql += " AND d.provider = $provider COLLATE NOCASE";
             cmd.Parameters.AddWithValue("$provider", query.Provider);
         }
         if (query.DataSourceId != null)
         {
             sql += " AND json_extract(d.extended_data, '$.DataSourceId') = $dataSourceId";
             cmd.Parameters.AddWithValue("$dataSourceId", query.DataSourceId);
+        }
+        if (query.DataSourceName != null)
+        {
+            sql += " AND json_extract(d.extended_data, '$.DataSourceName') = $dataSourceName";
+            cmd.Parameters.AddWithValue("$dataSourceName", query.DataSourceName);
         }
         if (query.Type != null)
         {

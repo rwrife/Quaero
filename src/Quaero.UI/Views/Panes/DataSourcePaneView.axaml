@@ -32,20 +32,33 @@
             </Border>
 
             <Border Background="#F4F8FE" BorderBrush="#D7E2F2" BorderThickness="1" CornerRadius="10" Padding="12">
-                <StackPanel Spacing="8">
-                    <TextBlock Text="Configuration" FontSize="16" FontWeight="SemiBold" />
-                    <ItemsControl ItemsSource="{Binding SelectedDataSource.Model.Settings}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Grid ColumnDefinitions="200,*" Margin="0,2">
-                                    <TextBlock Grid.Column="0" Text="{Binding Key}" FontWeight="SemiBold" Foreground="#344D6A" />
-                                    <TextBlock Grid.Column="1" Text="{Binding Value}" Foreground="#516B88" />
-                                </Grid>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
+                <TabControl>
+                    <TabItem Header="Configuration">
+                        <StackPanel Spacing="8" Margin="0,8,0,0">
+                            <ItemsControl ItemsSource="{Binding SelectedDataSource.Model.Settings}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid ColumnDefinitions="200,*" Margin="0,2">
+                                            <TextBlock Grid.Column="0" Text="{Binding Key}" FontWeight="SemiBold" Foreground="#344D6A" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Value}" Foreground="#516B88" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </TabItem>
+                    <TabItem Header="Debug Output">
+                        <TextBox Text="{Binding DataSourceDebugLog}"
+                                 IsReadOnly="True"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 MinHeight="140"
+                                 MaxHeight="220"
+                                 Margin="0,8,0,0" />
+                    </TabItem>
+                </TabControl>
             </Border>
+
         </StackPanel>
 
         <Border Grid.Row="1" Background="#F4F8FE" BorderBrush="#D7E2F2" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,12,0,0">

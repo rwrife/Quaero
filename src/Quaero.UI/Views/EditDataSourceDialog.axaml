@@ -70,6 +70,28 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+
+                <Border IsVisible="{Binding IsGmailPluginSelected}" Background="#F4F8FE" BorderBrush="#D7E2F2" BorderThickness="1" CornerRadius="8" Padding="10">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Gmail requires Google sign-in before indexing." FontSize="11" Foreground="#555" TextWrapping="Wrap" />
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="OAuth Client ID" FontWeight="SemiBold" />
+                            <TextBox x:Name="GmailClientIdBox" Watermark="Google OAuth desktop app client ID" />
+                        </StackPanel>
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="OAuth Client Secret (optional)" FontWeight="SemiBold" />
+                            <TextBox x:Name="GmailClientSecretBox" PasswordChar="●" Watermark="Needed for some OAuth client types" />
+                        </StackPanel>
+                        <Button Content="Sign in with Google"
+                                Click="OnGoogleSignInClicked"
+                                HorizontalAlignment="Left"
+                                IsEnabled="True"
+                                Background="#2961BD"
+                                Foreground="#FFFFFF"
+                                BorderBrush="#25578F" />
+                        <TextBlock x:Name="GmailSignInStatusText" FontSize="11" Foreground="#555" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
             </StackPanel>
         </ScrollViewer>
     </DockPanel>

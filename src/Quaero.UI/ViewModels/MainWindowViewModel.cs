@@ -73,6 +73,8 @@ public class MainWindowViewModel : INotifyPropertyChanged
     private bool _useProviderFallbackForDataSourceFiles;
     private string? _providerFallbackValue;
     private bool _useUnfilteredFallbackForDataSourceFiles;
+    private readonly Dictionary<string, string> _dataSourceDebugLogById = new();
+    private string _dataSourceDebugLog = string.Empty;
     private int _selectedDataSourceIndexedItemCount;
     private SearchResult? _selectedIndexedFile;
     private SearchHistoryEntry? _selectedSearchHistory;
@@ -209,6 +211,11 @@ public class MainWindowViewModel : INotifyPropertyChanged
     }
 
     public string SelectedDataSourceIndexedItemCountText => SelectedDataSourceIndexedItemCount.ToString("N0");
+    public string DataSourceDebugLog
+    {
+        get => _dataSourceDebugLog;
+        private set => SetField(ref _dataSourceDebugLog, value);
+    }
 
     public ObservableCollection<SearchResult> IndexedFiles { get; } = new();
     public ObservableCollection<SearchResult> SelectedDataSourceIndexedFiles { get; } = new();
@@ -267,6 +274,8 @@ public class MainWindowViewModel : INotifyPropertyChanged
         SelectedSearchHistory = null;
         SelectedChatHistory = null;
         SetActivePane(DetailPaneKind.DataSource);
+        DataSourceDebugLog = _dataSourceDebugLogById.GetValueOrDefault(dataSource.Id, string.Empty);
+        AppendDataSourceDebugLog($"Selected data source '{dataSource.Name}' ({dataSource.Id}).");
         await LoadSelectedDataSourceFilesAsync(reset: true);
     }
 
@@ -458,44 +467,66 @@ public class MainWindowViewModel : INotifyPropertyChanged
                 MaxResults = pageSize,
                 Offset = _dataSourceFilesOffset
             });
+            AppendDataSourceDebugLog($"Query by DataSourceId returned {results.Count} item(s) at offset {_dataSourceFilesOffset}.");
 
             if (reset && results.Count == 0)
             {
-                var fallbackProviders = new[]
+                results = await _indexingService.SearchAsync(new SearchQuery
                 {
-                    SelectedDataSource.PluginName,
-                    SelectedDataSource.Model.PluginType,
-                    SelectedDataSource.Model.PluginAssembly
-                }.Where(v => !string.IsNullOrWhiteSpace(v)).Distinct();
+                    DataSourceName = SelectedDataSource.Name,
+                    MaxResults = pageSize,
+                    Offset = 0
+                });
+                AppendDataSourceDebugLog($"Fallback query by DataSourceName returned {results.Count} item(s).");
 
-                foreach (var provider in fallbackProviders)
+                if (results.Count > 0)
                 {
-                    results = await _indexingService.SearchAsync(new SearchQuery
-                    {
-                        Provider = provider,
-                        MaxResults = pageSize,
-                        Offset = 0
-                    });
-
-                    if (results.Count > 0)
-                    {
-                        _useProviderFallbackForDataSourceFiles = true;
-                        _providerFallbackValue = provider;
-                        break;
-                    }
+                    _useProviderFallbackForDataSourceFiles = true;
+                    _useUnfilteredFallbackForDataSourceFiles = false;
+                    _providerFallbackValue = SelectedDataSource.Name;
                 }
-
-                if (results.Count == 0)
+                else
                 {
-                    results = await _indexingService.SearchAsync(new SearchQuery
+                    var fallbackProviders = new[]
                     {
-                        MaxResults = pageSize,
-                        Offset = 0
-                    });
-                    _useUnfilteredFallbackForDataSourceFiles = results.Count > 0;
+                        SelectedDataSource.Model.Settings.GetValueOrDefault("Provider"),
+                        SelectedDataSource.PluginName,
+                        SelectedDataSource.PluginName.ToLowerInvariant(),
+                        SelectedDataSource.Model.PluginType,
+                        SelectedDataSource.Model.PluginAssembly
+                    }.Where(v => !string.IsNullOrWhiteSpace(v)).Distinct();
+
+                    foreach (var provider in fallbackProviders)
+                    {
+                        results = await _indexingService.SearchAsync(new SearchQuery
+                        {
+                            Provider = provider,
+                            MaxResults = pageSize,
+                            Offset = 0
+                        });
+                        AppendDataSourceDebugLog($"Fallback query by Provider '{provider}' returned {results.Count} item(s).");
+
+                        if (results.Count > 0)
+                        {
+                            _useProviderFallbackForDataSourceFiles = false;
+                            _useUnfilteredFallbackForDataSourceFiles = true;
+                            _providerFallbackValue = provider;
+                            break;
+                        }
+                    }
                 }
             }
             else if (_useProviderFallbackForDataSourceFiles && !string.IsNullOrWhiteSpace(_providerFallbackValue))
+            {
+                results = await _indexingService.SearchAsync(new SearchQuery
+                {
+                    DataSourceName = _providerFallbackValue,
+                    MaxResults = pageSize,
+                    Offset = _dataSourceFilesOffset
+                });
+                AppendDataSourceDebugLog($"Paged fallback by DataSourceName returned {results.Count} item(s) at offset {_dataSourceFilesOffset}.");
+            }
+            else if (_useUnfilteredFallbackForDataSourceFiles && !string.IsNullOrWhiteSpace(_providerFallbackValue))
             {
                 results = await _indexingService.SearchAsync(new SearchQuery
                 {
@@ -503,14 +534,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
                     MaxResults = pageSize,
                     Offset = _dataSourceFilesOffset
                 });
-            }
-            else if (_useUnfilteredFallbackForDataSourceFiles)
-            {
-                results = await _indexingService.SearchAsync(new SearchQuery
-                {
-                    MaxResults = pageSize,
-                    Offset = _dataSourceFilesOffset
-                });
+                AppendDataSourceDebugLog($"Paged fallback by Provider '{_providerFallbackValue}' returned {results.Count} item(s) at offset {_dataSourceFilesOffset}.");
             }
 
             var countQuery = new SearchQuery
@@ -522,15 +546,19 @@ public class MainWindowViewModel : INotifyPropertyChanged
             {
                 countQuery = new SearchQuery
                 {
+                    DataSourceName = _providerFallbackValue
+                };
+            }
+            else if (_useUnfilteredFallbackForDataSourceFiles && !string.IsNullOrWhiteSpace(_providerFallbackValue))
+            {
+                countQuery = new SearchQuery
+                {
                     Provider = _providerFallbackValue
                 };
             }
-            else if (_useUnfilteredFallbackForDataSourceFiles)
-            {
-                countQuery = new SearchQuery();
-            }
 
             SelectedDataSourceIndexedItemCount = await _store.GetDocumentCountAsync(countQuery);
+            AppendDataSourceDebugLog($"Count query returned {SelectedDataSourceIndexedItemCount} total item(s).");
 
             foreach (var result in results)
                 SelectedDataSourceIndexedFiles.Add(result);
@@ -538,15 +566,33 @@ public class MainWindowViewModel : INotifyPropertyChanged
             _dataSourceFilesOffset += results.Count;
             HasMoreDataSourceFiles = results.Count == pageSize;
             StatusText = $"Loaded {SelectedDataSourceIndexedFiles.Count} file(s) for {SelectedDataSource.Name}.";
+            AppendDataSourceDebugLog(StatusText);
         }
         catch (Exception ex)
         {
             StatusText = $"Unable to load files for {SelectedDataSource.Name}: {ex.Message}";
+            AppendDataSourceDebugLog(StatusText);
         }
         finally
         {
             IsLoadingDataSourceFiles = false;
         }
+    }
+
+    public void AppendDataSourceDebugLog(string message)
+    {
+        var line = $"[{DateTime.Now:HH:mm:ss}] {message}";
+        if (string.IsNullOrWhiteSpace(DataSourceDebugLog))
+            DataSourceDebugLog = line;
+        else
+            DataSourceDebugLog += Environment.NewLine + line;
+
+        var lines = DataSourceDebugLog.Split(Environment.NewLine);
+        if (lines.Length > 300)
+            DataSourceDebugLog = string.Join(Environment.NewLine, lines[^300..]);
+
+        if (!string.IsNullOrWhiteSpace(SelectedDataSource?.Id))
+            _dataSourceDebugLogById[SelectedDataSource.Id] = DataSourceDebugLog;
     }
 
     public async Task RerunSelectedSearchHistoryAsync()

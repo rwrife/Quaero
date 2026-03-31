@@ -24,19 +24,19 @@ public class ImapSearchPlugin : ISearchPlugin
     {
         Id = "quaero.plugins.imap",
         Name = "IMAP Email",
-        Description = "Indexes emails from IMAP mail servers (Gmail, Outlook, etc.)",
+        Description = "Indexes emails from generic IMAP mail servers",
         Version = "1.0.0",
         SupportedFileExtensions = []
     };
 
     public IReadOnlyList<PluginSettingDescriptor> SettingDescriptors =>
     [
-        new() { Key = "Host", DisplayName = "IMAP Server", Description = "IMAP server hostname (e.g. imap.gmail.com)", SettingType = PluginSettingType.Text, DefaultValue = "imap.gmail.com", IsRequired = true },
+        new() { Key = "Host", DisplayName = "IMAP Server", Description = "IMAP server hostname", SettingType = PluginSettingType.Text, DefaultValue = "imap.example.com", IsRequired = true },
         new() { Key = "Port", DisplayName = "Port", Description = "IMAP server port", SettingType = PluginSettingType.Number, DefaultValue = "993" },
         new() { Key = "UseSsl", DisplayName = "Use SSL", Description = "Connect using SSL/TLS", SettingType = PluginSettingType.Boolean, DefaultValue = "true" },
         new() { Key = "Username", DisplayName = "Username", Description = "Email address or username", SettingType = PluginSettingType.Text, IsRequired = true },
         new() { Key = "Password", DisplayName = "Password", Description = "Password or app-specific password", SettingType = PluginSettingType.Password, IsRequired = true },
-        new() { Key = "Provider", DisplayName = "Provider Name", Description = "Display name for this email source (e.g. gmail, outlook)", SettingType = PluginSettingType.Text, DefaultValue = "email" },
+        new() { Key = "Provider", DisplayName = "Provider Name", Description = "Display name for this email source", SettingType = PluginSettingType.Text, DefaultValue = "imap" },
         new() { Key = "MaxMessages", DisplayName = "Max Messages", Description = "Maximum number of messages to index", SettingType = PluginSettingType.Number, DefaultValue = "500" }
     ];
 
@@ -48,7 +48,7 @@ public class ImapSearchPlugin : ISearchPlugin
         _useSsl = !string.Equals(settings.GetValueOrDefault("UseSsl", "true"), "false", StringComparison.OrdinalIgnoreCase);
         _username = settings.GetValueOrDefault("Username", string.Empty);
         _password = settings.GetValueOrDefault("Password", string.Empty);
-        _provider = settings.GetValueOrDefault("Provider", "email");
+        _provider = settings.GetValueOrDefault("Provider", "imap");
         _maxMessages = int.TryParse(settings.GetValueOrDefault("MaxMessages", "500"), out var m) ? m : 500;
         _lastSuccessfulRun = configuration.LastSuccessfulRun;
         return Task.CompletedTask;
@@ -57,7 +57,7 @@ public class ImapSearchPlugin : ISearchPlugin
     public async IAsyncEnumerable<DiscoveredDocument> DiscoverDocumentsAsync(
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(_username) || string.IsNullOrEmpty(_password))
+        if (string.IsNullOrWhiteSpace(_username) || string.IsNullOrWhiteSpace(_password))
             yield break;
 
         using var client = new ImapClient();
@@ -129,9 +129,6 @@ public class ImapSearchPlugin : ISearchPlugin
 
     private static string BuildEmailLink(UniqueId uid, string host)
     {
-        // For Gmail, construct a web link; otherwise use a generic reference
-        if (host.Contains("gmail", StringComparison.OrdinalIgnoreCase))
-            return $"https://mail.google.com/mail/u/0/#inbox/{uid}";
         return $"imap://{host}/INBOX;UID={uid}";
     }
 

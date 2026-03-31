@@ -41,8 +41,6 @@ public class MarkdownSearchPlugin : ISearchPlugin
         if (configuration.Settings.TryGetValue("FileGlob", out var glob) && !string.IsNullOrWhiteSpace(glob))
             _fileGlob = glob;
 
-        _lastSuccessfulRun = configuration.LastSuccessfulRun;
-
         return Task.CompletedTask;
     }
 
@@ -61,17 +59,6 @@ public class MarkdownSearchPlugin : ISearchPlugin
             if (cancellationToken.IsCancellationRequested) yield break;
 
             var fullPath = Path.Combine(_directory, file.Path);
-
-            // Incremental: skip files not modified since last successful run
-            if (_lastSuccessfulRun.HasValue)
-            {
-                try
-                {
-                    var lastWrite = File.GetLastWriteTimeUtc(fullPath);
-                    if (lastWrite < _lastSuccessfulRun.Value) continue;
-                }
-                catch { continue; }
-            }
 
             DiscoveredDocument? doc = null;
             try

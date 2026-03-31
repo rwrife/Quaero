@@ -70,6 +70,7 @@ public class EditDataSourceViewModel : INotifyPropertyChanged
                 BuildSettingFields(null);
                 OnPropertyChanged(nameof(SettingFields));
                 OnPropertyChanged(nameof(HasPlugin));
+                OnPropertyChanged(nameof(IsGmailPluginSelected));
                 if (_isNew && _selectedPluginType != null && string.IsNullOrWhiteSpace(Name))
                     Name = _selectedPluginType.Metadata.Name;
             }
@@ -77,6 +78,7 @@ public class EditDataSourceViewModel : INotifyPropertyChanged
     }
 
     public bool HasPlugin => _selectedPluginType != null;
+    public bool IsGmailPluginSelected => string.Equals(_selectedPluginType?.Metadata.Id, "quaero.plugins.gmail", StringComparison.OrdinalIgnoreCase);
 
     public ObservableCollection<SettingFieldViewModel> SettingFields { get; } = new();
 

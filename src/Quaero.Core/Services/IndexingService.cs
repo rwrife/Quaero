@@ -110,7 +110,10 @@ public class IndexingService
             {
                 var hash = ComputeHash(discovered.Content);
                 if (!await _store.HasChangedAsync(discovered.Location, hash, ct))
+                {
+                    await _store.EnsureDataSourceMetadataByLocationAsync(discovered.Location, ds.Id, ds.Name, ct);
                     continue;
+                }
 
                 var doc = new IndexedDocument
                 {

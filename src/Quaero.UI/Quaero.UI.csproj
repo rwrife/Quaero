@@ -23,4 +23,45 @@
     <ProjectReference Include="..\Quaero.Plugins.Abstractions\Quaero.Plugins.Abstractions.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Quaero.Plugins.Markdown\Quaero.Plugins.Markdown.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <Private>false</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Quaero.Plugins.Text\Quaero.Plugins.Text.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <Private>false</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Quaero.Plugins.Json\Quaero.Plugins.Json.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <Private>false</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Quaero.Plugins.Imap\Quaero.Plugins.Imap.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <Private>false</Private>
+    </ProjectReference>
+  </ItemGroup>
+
+  <Target Name="BundlePlugins" AfterTargets="Build">
+    <PropertyGroup>
+      <BundledPluginsDir>$(OutputPath)plugins\</BundledPluginsDir>
+    </PropertyGroup>
+    <MakeDir Directories="$(BundledPluginsDir)" />
+
+    <ItemGroup>
+      <PluginProjectDirs Include=
+        "..\Quaero.Plugins.Markdown\bin\$(Configuration)\$(TargetFramework)\;
+         ..\Quaero.Plugins.Text\bin\$(Configuration)\$(TargetFramework)\;
+         ..\Quaero.Plugins.Json\bin\$(Configuration)\$(TargetFramework)\;
+         ..\Quaero.Plugins.Imap\bin\$(Configuration)\$(TargetFramework)\" />
+    </ItemGroup>
+    <ItemGroup>
+      <AllPluginFiles Include="%(PluginProjectDirs.Identity)**\*.*"
+                      Exclude="%(PluginProjectDirs.Identity)**\Quaero.Plugins.Abstractions.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(AllPluginFiles)"
+          DestinationFolder="$(BundledPluginsDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
+
 </Project>
