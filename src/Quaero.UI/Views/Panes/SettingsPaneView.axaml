@@ -14,13 +14,17 @@
                             <TextBlock Text="{Binding IndexerStatusText}" />
                         </Border>
                     </StackPanel>
-                    <TextBlock Text="Indexer Output" FontWeight="SemiBold" />
-                    <Border Background="#152131" CornerRadius="6" Padding="10" MaxHeight="220">
-                        <ScrollViewer>
-                            <TextBlock Text="{Binding IndexerOutput}" FontFamily="Consolas"
-                                       Foreground="#D5E2F3" FontSize="11" TextWrapping="Wrap" />
-                        </ScrollViewer>
-                    </Border>
+                    <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto,Auto">
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Server Base URL" FontWeight="SemiBold" />
+                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding ServerBaseUrl, Mode=TwoWay}" Watermark="http://localhost:5055" />
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Indexer Output" FontWeight="SemiBold" Margin="0,10,0,0" />
+                        <Border Grid.Row="1" Grid.Column="1" Background="#152131" CornerRadius="6" Padding="10" MaxHeight="220" Margin="0,10,0,0">
+                            <ScrollViewer>
+                                <TextBlock Text="{Binding IndexerOutput}" FontFamily="Consolas"
+                                           Foreground="#D5E2F3" FontSize="11" TextWrapping="Wrap" />
+                            </ScrollViewer>
+                        </Border>
+                    </Grid>
                 </StackPanel>
             </Border>
 

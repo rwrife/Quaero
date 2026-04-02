@@ -11,10 +11,6 @@ using Quaero.Core.Models;
 
 namespace Quaero.UI.ViewModels;
 
-/// <summary>
-/// ViewModel for the Settings tab. Manages the indexer process lifecycle
-/// and exposes configuration paths.
-/// </summary>
 public class SettingsViewModel : INotifyPropertyChanged
 {
     private readonly IndexConfiguration _config;
@@ -29,15 +25,30 @@ public class SettingsViewModel : INotifyPropertyChanged
     private string _googleSignInStatus = "Not signed in";
     private string _googleRefreshToken = string.Empty;
     private bool _isGoogleSignInInProgress;
+    private string _serverBaseUrl = "http://localhost:5055";
 
     public SettingsViewModel(IndexConfiguration config)
     {
         _config = config;
+        _serverBaseUrl = string.IsNullOrWhiteSpace(config.ServerBaseUrl) ? "http://localhost:5055" : config.ServerBaseUrl;
         _googleOAuthSettingsPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "Quaero",
             "google-oauth.json");
         LoadGoogleOAuthSettings();
+    }
+
+    public string ServerBaseUrl
+    {
+        get => _serverBaseUrl;
+        set
+        {
+            if (SetField(ref _serverBaseUrl, value))
+            {
+                _config.ServerBaseUrl = string.IsNullOrWhiteSpace(value) ? "http://localhost:5055" : value.Trim();
+                SaveConfiguration();
+            }
+        }
     }
 
     public string GoogleClientSecret
@@ -100,10 +111,7 @@ public class SettingsViewModel : INotifyPropertyChanged
         private set => SetField(ref _googleSignInStatus, value);
     }
 
-    public bool HasGoogleSignIn
-    {
-        get => !string.IsNullOrWhiteSpace(_googleRefreshToken);
-    }
+    public bool HasGoogleSignIn => !string.IsNullOrWhiteSpace(_googleRefreshToken);
 
     public bool IsGoogleSignInInProgress
     {
@@ -112,26 +120,20 @@ public class SettingsViewModel : INotifyPropertyChanged
     }
 
     public string GoogleOAuthSettingsPath => _googleOAuthSettingsPath;
-
     public string DatabasePath => _config.DatabasePath;
     public string PluginsDirectory => _config.PluginsDirectory;
-    public string DataSourcesConfigPath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "Quaero", "datasources.json");
+    public string DataSourcesConfigPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Quaero", "datasources.json");
 
     public string IndexerExePath
     {
         get
         {
-            // The indexer is bundled alongside the UI in the indexer/ subfolder
             var bundled = Path.Combine(AppContext.BaseDirectory, "indexer", "Quaero.Indexer.exe");
             if (File.Exists(bundled)) return bundled;
 
-            // Fallback: check for .dll (cross-platform)
             var bundledDll = Path.Combine(AppContext.BaseDirectory, "indexer", "Quaero.Indexer.dll");
             if (File.Exists(bundledDll)) return bundledDll;
 
-            // Dev fallback: sibling project output
             var devPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..",
                 "Quaero.Indexer", "bin", "Debug", "net10.0", "Quaero.Indexer.exe");
             if (File.Exists(devPath)) return Path.GetFullPath(devPath);
@@ -169,8 +171,8 @@ public class SettingsViewModel : INotifyPropertyChanged
             if (isDll)
                 psi.ArgumentList.Add(exePath);
 
-            // Pass the plugins directory so the indexer uses the same one
             psi.Environment["QUAERO_PLUGINS_DIR"] = _config.PluginsDirectory;
+            psi.Environment["QUAERO_SERVER_BASE_URL"] = _config.ServerBaseUrl;
 
             _indexerProcess = new Process { StartInfo = psi, EnableRaisingEvents = true };
             _indexerProcess.OutputDataReceived += OnOutputReceived;
@@ -207,9 +209,6 @@ public class SettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    /// <summary>
-    /// Clean up process on app shutdown.
-    /// </summary>
     public void Shutdown()
     {
         if (_indexerProcess != null && !_indexerProcess.HasExited)
@@ -234,7 +233,6 @@ public class SettingsViewModel : INotifyPropertyChanged
 
     private void AppendOutput(string line)
     {
-        // Keep last 200 lines
         var lines = IndexerOutput.Split('\n');
         if (lines.Length > 200)
             IndexerOutput = string.Join('\n', lines[^200..]) + "\n" + line;
@@ -386,6 +384,19 @@ public class SettingsViewModel : INotifyPropertyChanged
             if (listener.IsListening)
                 listener.Stop();
             IsGoogleSignInInProgress = false;
+        }
+    }
+
+    private void SaveConfiguration()
+    {
+        try
+        {
+            var configPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Quaero", "config.json");
+            Directory.CreateDirectory(Path.GetDirectoryName(configPath)!);
+            File.WriteAllText(configPath, JsonSerializer.Serialize(_config, new JsonSerializerOptions { WriteIndented = true }));
+        }
+        catch
+        {
         }
     }
 

@@ -25,19 +25,32 @@ public class Program
         builder.Services.AddSingleton<IndexingService>();
         builder.Services.AddHostedService<IndexingBackgroundService>();
 
-        // Allow the UI (or any local client) to call the API
-        builder.Services.AddCors(options =>
-        {
-            options.AddDefaultPolicy(policy =>
-                policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
-        });
-
         var app = builder.Build();
-        app.UseCors();
 
         // ── API Endpoints ──────────────────────────────────────────────
 
-        app.MapGet("/", () => "Quaero Indexer Service");
+        app.MapGet("/", () => Results.Ok(new
+        {
+            name = "Quaero Indexer Service",
+            baseUrl = config.ServerBaseUrl
+        }));
+
+        app.MapGet("/api/config", (IndexConfiguration cfg) => Results.Ok(new
+        {
+            serverBaseUrl = cfg.ServerBaseUrl,
+            pluginsDirectory = cfg.PluginsDirectory,
+            databasePath = cfg.DatabasePath
+        }));
+
+        app.MapPut("/api/config/server-base-url", (IndexConfiguration cfg, ServerBaseUrlRequest request) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.ServerBaseUrl))
+                return Results.BadRequest("ServerBaseUrl is required.");
+
+            cfg.ServerBaseUrl = request.ServerBaseUrl.Trim();
+            SaveConfiguration(cfg);
+            return Results.Ok(new { serverBaseUrl = cfg.ServerBaseUrl });
+        });
 
         app.MapGet("/api/plugins", (PluginRegistry registry) =>
         {
@@ -46,6 +59,18 @@ public class Program
 
         await app.RunAsync();
     }
+
+    private static void SaveConfiguration(IndexConfiguration config)
+    {
+        var configPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Quaero", "config.json");
+
+        Directory.CreateDirectory(Path.GetDirectoryName(configPath)!);
+        File.WriteAllText(configPath, JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }));
+    }
+
+    private sealed record ServerBaseUrlRequest(string ServerBaseUrl);
 
     private static IndexConfiguration LoadConfiguration()
     {

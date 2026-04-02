@@ -20,15 +20,12 @@ public class IndexConfiguration
 
     private static string ResolvePluginsDirectory()
     {
-        // 1. Prefer bundled plugins/ folder alongside the executable (most reliable)
         var bundled = Path.Combine(AppContext.BaseDirectory, "plugins");
         if (Directory.Exists(bundled)) return bundled;
 
-        // 2. Allow env var override for custom deployments
         var envOverride = Environment.GetEnvironmentVariable("QUAERO_PLUGINS_DIR");
         if (!string.IsNullOrEmpty(envOverride)) return envOverride;
 
-        // 3. Fall back to user-local folder
         return Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "Quaero", "plugins");
@@ -37,8 +34,17 @@ public class IndexConfiguration
     public int IndexIntervalMinutes { get; set; } = 30;
 
     /// <summary>
-    /// Base URL for the Indexer API. The UI uses this to fetch discovered plugins
-    /// and other indexer status information.
+    /// Base URL for the background server / indexer API.
+    /// Defaults to localhost, but can point at another host.
     /// </summary>
-    public string IndexerApiBaseUrl { get; set; } = "http://localhost:5199";
+    public string ServerBaseUrl { get; set; } = ResolveServerBaseUrl();
+
+    private static string ResolveServerBaseUrl()
+    {
+        var envOverride = Environment.GetEnvironmentVariable("QUAERO_SERVER_BASE_URL");
+        if (!string.IsNullOrWhiteSpace(envOverride))
+            return envOverride.Trim();
+
+        return "http://localhost:5055";
+    }
 }
