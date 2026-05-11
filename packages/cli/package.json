@@ -1,0 +1,19 @@
+{
+  "name": "@quaero/cli",
+  "version": "0.2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "quaero": "./dist/index.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -b",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@quaero/core": "0.2.0",
+    "@quaero/plugin-api": "0.2.0"
+  }
+}
