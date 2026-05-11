@@ -15,6 +15,11 @@
     "build": "tsc -b"
   },
   "dependencies": {
-    "@quaero/plugin-api": "0.2.0"
+    "@quaero/plugin-api": "0.2.0",
+    "fast-glob": "^3.3.2",
+    "markdown-it": "^14.1.0"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.1.2"
   }
 }

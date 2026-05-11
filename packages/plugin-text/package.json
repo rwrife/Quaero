@@ -15,6 +15,7 @@
     "build": "tsc -b"
   },
   "dependencies": {
-    "@quaero/plugin-api": "0.2.0"
+    "@quaero/plugin-api": "0.2.0",
+    "fast-glob": "^3.3.2"
   }
 }
