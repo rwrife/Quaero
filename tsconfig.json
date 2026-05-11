@@ -1,0 +1,13 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/plugin-api" },
+    { "path": "packages/core" },
+    { "path": "packages/plugin-markdown" },
+    { "path": "packages/plugin-text" },
+    { "path": "packages/plugin-json" },
+    { "path": "packages/plugin-imap" },
+    { "path": "packages/daemon" },
+    { "path": "packages/cli" }
+  ]
+}
