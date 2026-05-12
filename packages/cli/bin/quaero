@@ -1,0 +1,7 @@
+#!/usr/bin/env node
+// Forward to the compiled CLI entry. Useful when the package is consumed
+// without the npm-installed bin shim (e.g. running directly from a clone).
+import('../dist/bin/quaero.js').catch((err) => {
+  console.error('[quaero] failed to launch:', err);
+  process.exit(1);
+});

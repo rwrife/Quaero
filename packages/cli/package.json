@@ -5,15 +5,23 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "quaero": "./dist/index.js"
+    "quaero": "./bin/quaero"
   },
-  "files": ["dist"],
+  "files": ["dist", "bin"],
   "scripts": {
     "build": "tsc -b",
-    "start": "node dist/index.js"
+    "start": "node dist/bin/quaero.js"
   },
   "dependencies": {
     "@quaero/core": "0.2.0",
-    "@quaero/plugin-api": "0.2.0"
+    "@quaero/daemon": "0.2.0",
+    "@quaero/plugin-api": "0.2.0",
+    "commander": "^12.1.0",
+    "ink": "^5.0.1",
+    "ink-text-input": "^6.0.0",
+    "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.11"
   }
 }
