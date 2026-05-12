@@ -4,13 +4,17 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "quaero-daemon": "./dist/bin/quaero-daemon.js"
+  },
   "files": ["dist"],
   "scripts": {
     "build": "tsc -b",
-    "start": "node dist/index.js"
+    "start": "node dist/bin/quaero-daemon.js"
   },
   "dependencies": {
     "@quaero/core": "0.2.0",
-    "@quaero/plugin-api": "0.2.0"
+    "@quaero/plugin-api": "0.2.0",
+    "fastify": "^5.0.0"
   }
 }
