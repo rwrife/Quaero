@@ -159,6 +159,18 @@ describe('IndexStore', () => {
     store.close();
   });
 
+  it('filters by provider and type', () => {
+    const store = new IndexStore(makeConfig());
+    store.upsertDocument(makeDoc({ provider: 'one', type: 'text', content: 'apple' }));
+    store.upsertDocument(makeDoc({ provider: 'two', type: 'markdown', content: 'apple banana' }));
+    expect(store.search({ queryText: 'apple', provider: 'one' })).toHaveLength(1);
+    expect(store.search({ queryText: 'apple', provider: 'two' })).toHaveLength(1);
+    expect(store.search({ queryText: 'apple', type: 'markdown' })).toHaveLength(1);
+    expect(store.search({ queryText: 'apple', type: 'text', provider: 'two' })).toHaveLength(0);
+    expect(store.getProviders().sort()).toEqual(['one', 'two']);
+    store.close();
+  });
+
   it('encrypts content at rest when configured', () => {
     const cfg = makeConfig({ encryptionEnabled: true, encryptionKey: 'secret-key' });
     const store = new IndexStore(cfg);
